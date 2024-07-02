@@ -661,12 +661,15 @@ void drawMinimap(const int player, SDL_Rect rect, bool drawingSharedMap)
 					drawCircleMesh((real_t)x + 0.5, (real_t)y + 0.5, (real_t)1.0, rect, makeColor(191, 63, 0, 255));
 				}
 			}
-			else if ( entity->behavior == &actItem && entity->sprite >= items[TOOL_PLAYER_LOOT_BAG].index &&
-				entity->sprite < (items[TOOL_PLAYER_LOOT_BAG].index + items[TOOL_PLAYER_LOOT_BAG].variations) )
+			else if (entity->behavior == &actItem && entity->sprite == 1207 || 1208 || 1209 || 1210 || 1211 || 1315 || 1316 || 1317)
 			{
 				real_t skullx = std::min<real_t>(std::max(0.0, entity->x / 16), map.width - 1);
 				real_t skully = std::min<real_t>(std::max(0.0, entity->y / 16), map.height - 1);
-				int playerOwner = entity->sprite - items[TOOL_PLAYER_LOOT_BAG].index;
+				int playerOwner = entity->sprite - 1206;
+				if (playerOwner >= 5)
+				{
+					playerOwner -= 103;
+				}
 				Uint32 color = playerColor(playerOwner, colorblind_lobby, false);
 
 				if ( colorblind_lobby )
