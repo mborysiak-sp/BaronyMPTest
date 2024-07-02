@@ -1,8 +1,9 @@
-More Players -
+More Players...
 
 documentation https://docs.google.com/document/d/16AXSujLwUjhIEkNsELv-WbexX-usdkxYH-vZWOyATsA/edit?usp=sharing
 
-- More Players
+...More Players
+
 ![Linux-CI_fmod_steam](https://github.com/TurningWheel/Barony/workflows/Linux-CI_fmod_steam/badge.svg) ![Linux-CI_fmod_steam_eos](https://github.com/TurningWheel/Barony/workflows/Linux-CI_fmod_steam_eos/badge.svg)
 
 # Update - 3rd October 2023
