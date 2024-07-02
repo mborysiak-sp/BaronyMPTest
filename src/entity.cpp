@@ -3299,6 +3299,7 @@ void Entity::handleEffects(Stat* myStats)
 				sendPacketSafe(net_sock, -1, net_packet, player - 1);
 			}
 			serverUpdatePlayerLVL(); // update all clients of party levels.
+			serverUpdatePlayerLVL2();
 		}
 
 		for ( i = 0; i < NUMSTATS; ++i )

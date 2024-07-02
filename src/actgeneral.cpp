@@ -3119,6 +3119,7 @@ void TextSourceScript::updateClientInformation(int player, bool clearInventory, 
 		sendPacketSafe(net_sock, -1, net_packet, player - 1);
 
 		serverUpdatePlayerLVL();
+		serverUpdatePlayerLVL2();
 	}
 	else if ( updateType == CLIENT_UPDATE_CLASS )
 	{

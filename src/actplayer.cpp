@@ -1474,12 +1474,17 @@ Uint32 Player::Ghost_t::cooldownTeleportDelay = TICKS_PER_SECOND * 3;
 
 int Player::Ghost_t::getSpriteForPlayer(const int player)
 {
-	if ( !colorblind_lobby )
+	if (!colorblind_lobby)
 	{
-		return ((player < 4) ? (GHOST_MODEL_P1 + player) : GHOST_MODEL_PX);
+		int var = player;
+		if (var > 4)
+		{
+			var += 75;
+		}
+		return GHOST_MODEL_P1 + var;
 	}
 	Uint32 index = 4;
-	switch ( player )
+	switch (player)
 	{
 	case 0:
 		index = 2;
@@ -1688,6 +1693,15 @@ void actDeathGhost(Entity* my)
 				light_type = "ghost_red";
 				break;
 			case Player::Ghost_t::GHOST_MODEL_P4:
+				light_type = "ghost_purple";
+				break;
+			case Player::Ghost_t::GHOST_MODEL_P5:
+				light_type = "ghost_blue";
+				break;
+			case Player::Ghost_t::GHOST_MODEL_P6:
+				light_type = "ghost_orange";
+				break;
+			case Player::Ghost_t::GHOST_MODEL_P7:
 				light_type = "ghost_pink";
 				break;
 			default:
@@ -1711,6 +1725,15 @@ void actDeathGhost(Entity* my)
 			light_type = "ghost_red_sneaking_ambient";
 			break;
 		case Player::Ghost_t::GHOST_MODEL_P4:
+			light_type = "ghost_purple_sneaking_ambient";
+			break;
+		case Player::Ghost_t::GHOST_MODEL_P5:
+			light_type = "ghost_blue_sneaking_ambient";
+			break;
+		case Player::Ghost_t::GHOST_MODEL_P6:
+			light_type = "ghost_orange_sneaking_ambient";
+			break;
+		case Player::Ghost_t::GHOST_MODEL_P7:
 			light_type = "ghost_pink_sneaking_ambient";
 			break;
 		default:
