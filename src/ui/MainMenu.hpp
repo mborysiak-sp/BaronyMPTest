@@ -38,6 +38,7 @@ namespace MainMenu {
 		None,           // don't fade anywhere (???)
 		TitleScreen,    // fade to the title screen
 		RootMainMenu,   // return to main menu, save no score if ingame
+		RootMainMenuNoEndGame,   // return to main menu, doEndGame already done
         Endgame,        // save a highscore and return to main menu
 		Victory,        // save a highscore and roll credits
 
@@ -113,6 +114,7 @@ namespace MainMenu {
     void controllerDisconnected(int player);                        // controller disconnect prompt, eg if a player unplugs a controller
 	void tutorialFirstTimeCompleted();								// tutorial first level completed event
     void openGameoverWindow(int player, bool tutorial = false);     // opens gameover window, used when player dies
+	void openCompendium();
 	void disconnectedFromServer(const char* text);                  // called when the player is disconnected from the server, prompts them to end the game
 	void receivedInvite(void*);                                     // called when a player receives an invite to a lobby (EOS or Steam)
 	void setupSplitscreen();                                        // used to resize player game views, for example if a player drops or we change the aspect ratio
@@ -189,5 +191,165 @@ namespace MainMenu {
 		static bool init;
 		static void update_details_text(Frame& card);
 		static void update_details_text(Frame& card, void* stats);
+		static void update_details_text(Frame& card, int race, int modified_race);
+	};
+
+	struct MainMenuBanners_t
+	{
+		static std::string updateBannerImg;
+		static std::string updateBannerImgHighlight;
+		static std::string updateBannerURL;
+		static void readFromFile();
+	};
+
+	enum class DLC {
+		Base,
+		MythsAndOutcasts,
+		LegendsAndPariahs
+	};
+
+	struct Class {
+		DLC dlc;
+		const char* image;
+		const char* image_highlighted;
+		const char* image_locked;
+	};
+
+	const std::unordered_map<std::string, Class> classes = {
+		{"barbarian", {
+			DLC::Base,
+			"ClassSelect_Icon_Barbarian_00.png",
+			"ClassSelect_Icon_BarbarianOn_00.png",
+			"ClassSelect_Icon_BarbarianLocked_00.png",
+			}},
+		{"warrior", {
+			DLC::Base,
+			"ClassSelect_Icon_Warrior_00.png",
+			"ClassSelect_Icon_WarriorOn_00.png",
+			"ClassSelect_Icon_WarriorLocked_00.png",
+			}},
+		{"healer", {
+			DLC::Base,
+			"ClassSelect_Icon_Healer_00.png",
+			"ClassSelect_Icon_HealerOn_00.png",
+			"ClassSelect_Icon_HealerLocked_00.png",
+			}},
+		{"rogue", {
+			DLC::Base,
+			"ClassSelect_Icon_Rogue_00.png",
+			"ClassSelect_Icon_RogueOn_00.png",
+			"ClassSelect_Icon_RogueLocked_00.png",
+			}},
+		{"wanderer", {
+			DLC::Base,
+			"ClassSelect_Icon_Wanderer_00.png",
+			"ClassSelect_Icon_WandererOn_00.png",
+			"ClassSelect_Icon_WandererLocked_00.png",
+			}},
+		{"cleric", {
+			DLC::Base,
+			"ClassSelect_Icon_Cleric_00.png",
+			"ClassSelect_Icon_ClericOn_00.png",
+			"ClassSelect_Icon_ClericLocked_00.png",
+			}},
+		{"merchant", {
+			DLC::Base,
+			"ClassSelect_Icon_Merchant_00.png",
+			"ClassSelect_Icon_MerchantOn_00.png",
+			"ClassSelect_Icon_MerchantLocked_00.png",
+			}},
+		{"wizard", {
+			DLC::Base,
+			"ClassSelect_Icon_Wizard_00.png",
+			"ClassSelect_Icon_WizardOn_00.png",
+			"ClassSelect_Icon_WizardLocked_00.png",
+			}},
+		{"arcanist", {
+			DLC::Base,
+			"ClassSelect_Icon_Arcanist_00.png",
+			"ClassSelect_Icon_ArcanistOn_00.png",
+			"ClassSelect_Icon_ArcanistLocked_00.png",
+			}},
+		{"joker", {
+			DLC::Base,
+			"ClassSelect_Icon_Jester_00.png",
+			"ClassSelect_Icon_JesterOn_00.png",
+			"ClassSelect_Icon_JesterLocked_00.png",
+			}},
+		{"sexton", {
+			DLC::Base,
+			"ClassSelect_Icon_Sexton_00.png",
+			"ClassSelect_Icon_SextonOn_00.png",
+			"ClassSelect_Icon_SextonLocked_00.png",
+			}},
+		{"ninja", {
+			DLC::Base,
+			"ClassSelect_Icon_Ninja_00.png",
+			"ClassSelect_Icon_NinjaOn_00.png",
+			"ClassSelect_Icon_NinjaLocked_00.png",
+			}},
+		{"monk", {
+			DLC::Base,
+			"ClassSelect_Icon_Monk_00.png",
+			"ClassSelect_Icon_MonkOn_00.png",
+			"ClassSelect_Icon_MonkLocked_00.png",
+			}},
+		{"conjurer", {
+			DLC::MythsAndOutcasts,
+			"ClassSelect_Icon_Conjurer_00.png",
+			"ClassSelect_Icon_ConjurerOn_00.png",
+			"ClassSelect_Icon_ConjurerLocked_00.png",
+			}},
+		{"accursed", {
+			DLC::MythsAndOutcasts,
+			"ClassSelect_Icon_Accursed_00.png",
+			"ClassSelect_Icon_AccursedOn_00.png",
+			"ClassSelect_Icon_AccursedLocked_00.png",
+			}},
+		{"mesmer", {
+			DLC::MythsAndOutcasts,
+			"ClassSelect_Icon_Mesmer_00.png",
+			"ClassSelect_Icon_MesmerOn_00.png",
+			"ClassSelect_Icon_MesmerLocked_00.png",
+			}},
+		{"brewer", {
+			DLC::MythsAndOutcasts,
+			"ClassSelect_Icon_Brewer_00.png",
+			"ClassSelect_Icon_BrewerOn_00.png",
+			"ClassSelect_Icon_BrewerLocked_00.png",
+			}},
+		{"mechanist", {
+			DLC::LegendsAndPariahs,
+			"ClassSelect_Icon_Mechanist_00.png",
+			"ClassSelect_Icon_MechanistOn_00.png",
+			"ClassSelect_Icon_MechanistLocked_00.png",
+			}},
+		{"punisher", {
+			DLC::LegendsAndPariahs,
+			"ClassSelect_Icon_Punisher_00.png",
+			"ClassSelect_Icon_PunisherOn_00.png",
+			"ClassSelect_Icon_PunisherLocked_00.png",
+			}},
+		{"shaman", {
+			DLC::LegendsAndPariahs,
+			"ClassSelect_Icon_Shaman_00.png",
+			"ClassSelect_Icon_ShamanOn_00.png",
+			"ClassSelect_Icon_ShamanLocked_00.png",
+			}},
+		{"hunter", {
+			DLC::LegendsAndPariahs,
+			"ClassSelect_Icon_Hunter_00.png",
+			"ClassSelect_Icon_HunterOn_00.png",
+			"ClassSelect_Icon_HunterLocked_00.png",
+			}},
+	};
+
+	static const char* classes_in_order[] = {
+		"barbarian", "warrior", "healer",
+		"rogue", "wanderer", "cleric", "merchant",
+		"wizard", "arcanist", "joker", "sexton",
+		"ninja", "monk", "conjurer", "accursed",
+		"mesmer", "brewer", "mechanist", "punisher",
+		"shaman", "hunter"
 	};
 }

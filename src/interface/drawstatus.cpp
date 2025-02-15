@@ -441,7 +441,7 @@ void drawHPMPBars(int player)
 	}
 	Uint32 mpColorBG = makeColorRGB(0, 0, 48);
 	Uint32 mpColorFG = makeColorRGB(0, 24, 128);
-	if ( stats[player] && stats[player]->playerRace == RACE_INSECTOID && stats[player]->appearance == 0 )
+	if ( stats[player] && stats[player]->playerRace == RACE_INSECTOID && stats[player]->stat_appearance == 0 )
 	{
 		ttfPrintText(ttf12, pos.x + (playerStatusBarWidth / 2 - 10), pos.y + 6, Language::get(3768));
 		mpColorBG = makeColorRGB(32, 48, 0);
@@ -1068,7 +1068,7 @@ void drawStatus(int player)
 
 							if ( itemCategory(item) == SPELLBOOK && stats[player] 
 								&& (stats[player]->type == GOBLIN
-									|| (stats[player]->playerRace == RACE_GOBLIN && stats[player]->appearance == 0)) )
+									|| (stats[player]->playerRace == RACE_GOBLIN && stats[player]->stat_appearance == 0)) )
 							{
 								learnedSpell = true; // goblinos can't learn spells but always equip books.
 							}
@@ -1186,7 +1186,7 @@ void drawStatus(int player)
 				}
 				else
 				{
-					spell_t* spell = getSpellFromItem(player, item);
+					spell_t* spell = getSpellFromItem(player, item, false);
 					if ( players[player]->magic.selectedSpell() == spell
 						&& (players[player]->magic.selected_spell_last_appearance == item->appearance || players[player]->magic.selected_spell_last_appearance == -1 ) )
 					{
@@ -1329,7 +1329,7 @@ void drawStatus(int player)
 
 					if ( itemCategory(item) == SPELL_CAT )
 					{
-						spell_t* spell = getSpellFromItem(player, item);
+						spell_t* spell = getSpellFromItem(player, item, false);
 						if ( drawHotBarTooltipOnCycle )
 						{
 							//drawSpellTooltip(player, spell, item, &src);
@@ -1856,7 +1856,7 @@ void drawStatus(int player)
 				if ( pressed != Player::Hotbar_t::GROUP_NONE 
 					&& players[player]->hotbar.faceMenuQuickCastEnabled && item && itemCategory(item) == SPELL_CAT )
 				{
-					spell_t* spell = getSpellFromItem(player, item);
+					spell_t* spell = getSpellFromItem(player, item, false);
 					if ( spell && players[player]->magic.selectedSpell() == spell )
 					{
 						players[player]->hotbar.faceMenuQuickCast = true;
@@ -2017,7 +2017,7 @@ void drawStatus(int player)
 			if ( itemCategory(item) == SPELLBOOK && stats[player] )
 			{
 				if ( stats[player]->type == GOBLIN || stats[player]->type == CREATURE_IMP
-						|| (stats[player]->playerRace == RACE_GOBLIN && stats[player]->appearance == 0) )
+						|| (stats[player]->playerRace == RACE_GOBLIN && stats[player]->stat_appearance == 0) )
 				{
 					learnedSpell = true; // goblinos can't learn spells but always equip books.
 				}
@@ -2909,59 +2909,70 @@ void drawStatusNew(const int player)
 		{
 			// if hotbar_numkey_quick_add is enabled, then the number keys won't do the default equip function
 			// skips equipping items if the mouse is in the hotbar or inventory area. otherwise the below code runs.
+
+			bool pressed = false;
 			if ( Input::inputs[player].binaryToggle("Hotbar Slot 1") )
 			{
 				Input::inputs[player].consumeBinaryToggle("Hotbar Slot 1");
 				item = uidToItem(hotbar[0].item);
 				hotbar_t.current_hotbar = 0;
+				pressed = true;
 			}
 			if ( Input::inputs[player].binaryToggle("Hotbar Slot 2") )
 			{
 				Input::inputs[player].consumeBinaryToggle("Hotbar Slot 2");
 				item = uidToItem(hotbar[1].item);
 				hotbar_t.current_hotbar = 1;
+				pressed = true;
 			}
 			if ( Input::inputs[player].binaryToggle("Hotbar Slot 3") )
 			{
 				Input::inputs[player].consumeBinaryToggle("Hotbar Slot 3");
 				item = uidToItem(hotbar[2].item);
 				hotbar_t.current_hotbar = 2;
+				pressed = true;
 			}
 			if ( Input::inputs[player].binaryToggle("Hotbar Slot 4") )
 			{
 				Input::inputs[player].consumeBinaryToggle("Hotbar Slot 4");
 				item = uidToItem(hotbar[3].item);
 				hotbar_t.current_hotbar = 3;
+				pressed = true;
 			}
 			if ( Input::inputs[player].binaryToggle("Hotbar Slot 5") )
 			{
 				Input::inputs[player].consumeBinaryToggle("Hotbar Slot 5");
 				item = uidToItem(hotbar[4].item);
 				hotbar_t.current_hotbar = 4;
+				pressed = true;
 			}
 			if ( Input::inputs[player].binaryToggle("Hotbar Slot 6") )
 			{
 				Input::inputs[player].consumeBinaryToggle("Hotbar Slot 6");
 				item = uidToItem(hotbar[5].item);
 				hotbar_t.current_hotbar = 5;
+				pressed = true;
 			}
 			if ( Input::inputs[player].binaryToggle("Hotbar Slot 7") )
 			{
 				Input::inputs[player].consumeBinaryToggle("Hotbar Slot 7");
 				item = uidToItem(hotbar[6].item);
 				hotbar_t.current_hotbar = 6;
+				pressed = true;
 			}
 			if ( Input::inputs[player].binaryToggle("Hotbar Slot 8") )
 			{
 				Input::inputs[player].consumeBinaryToggle("Hotbar Slot 8");
 				item = uidToItem(hotbar[7].item);
 				hotbar_t.current_hotbar = 7;
+				pressed = true;
 			}
 			if ( Input::inputs[player].binaryToggle("Hotbar Slot 9") )
 			{
 				Input::inputs[player].consumeBinaryToggle("Hotbar Slot 9");
 				item = uidToItem(hotbar[8].item);
 				hotbar_t.current_hotbar = 8;
+				pressed = true;
 			}
 			if ( Input::inputs[player].binaryToggle("Hotbar Slot 10")
 				&& hotbar_t.getHotbarSlotFrame(9)
@@ -2970,6 +2981,17 @@ void drawStatusNew(const int player)
 				Input::inputs[player].consumeBinaryToggle("Hotbar Slot 10");
 				item = uidToItem(hotbar[9].item);
 				hotbar_t.current_hotbar = 9;
+				pressed = true;
+			}
+
+			// quickcasting spells
+			if ( pressed && item && itemCategory(item) == SPELL_CAT )
+			{
+				spell_t* spell = getSpellFromItem(player, item, true);
+				if ( spell && players[player]->magic.selectedSpell() == spell )
+				{
+					players[player]->hotbar.faceMenuQuickCast = true;
+				}
 			}
 		}
 
@@ -3089,7 +3111,7 @@ void drawStatusNew(const int player)
 					// quickcasting spells
 					if (item && itemCategory(item) == SPELL_CAT )
 					{
-						spell_t* spell = getSpellFromItem(player, item);
+						spell_t* spell = getSpellFromItem(player, item, true);
 						if ( spell && players[player]->magic.selectedSpell() == spell )
 						{
 							players[player]->hotbar.faceMenuQuickCast = true;
@@ -3273,6 +3295,13 @@ void drawStatusNew(const int player)
 						{
 							bindingPressed = true;
 
+							if ( Input::inputs[player].getPlayerControlType() == Input::PLAYER_CONTROLLED_BY_KEYBOARD )
+							{
+								// rare bug causes rogue activations on keyboard controls holding space + opening inventory
+								// skip this section and consume presses
+								break;
+							}
+
 							if ( option == ItemContextMenuPrompts::PROMPT_DROP && players[player]->paperDoll.isItemOnDoll(*item) )
 							{
 								// need to unequip
@@ -3401,7 +3430,7 @@ void drawStatusNew(const int player)
 			if ( itemCategory(item) == SPELLBOOK && stats[player] )
 			{
 				if ( stats[player]->type == GOBLIN || stats[player]->type == CREATURE_IMP
-					|| (stats[player]->playerRace == RACE_GOBLIN && stats[player]->appearance == 0) )
+					|| (stats[player]->playerRace == RACE_GOBLIN && stats[player]->stat_appearance == 0) )
 				{
 					learnedSpell = true; // goblinos can't learn spells but always equip books.
 				}

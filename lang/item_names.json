@@ -982,7 +982,7 @@
             "name_unidentified": "shaman mask"
         },
         "spellbook_amplify_magic": {
-            "name_identified": "spellbook of amplify magic",
+            "name_identified": "spellbook of elemental focus",
             "name_unidentified": "spellbook"
         },
         "spellbook_shadow_tag": {
@@ -1316,6 +1316,18 @@
 		"hat_hood_whispers": {
 			"name_identified": "hood of whispers",
 			"name_unidentified": "hood"
+		},
+		"ring_resolve": {
+			"name_identified": "ring of resolve",
+			"name_unidentified": "ring"
+		},
+		"cloak_guardian": {
+			"name_identified": "cloak of the guardian",
+			"name_unidentified": "cloak"
+		},
+		"mask_marigold": {
+			"name_identified": "marigold",
+			"name_unidentified": "marigold"
 		}
     },
 	"spell_names": {
@@ -1483,6 +1495,21 @@
 		},
 		"spell_ghost_bolt": {
 			"name": "Ghostbolt"
+		},
+		"spell_slime_acid": {
+			"name": "Slime Spray (Acid)"
+		},
+		"spell_slime_water": {
+			"name": "Slime Spray (Water)"
+		},
+		"spell_slime_fire": {
+			"name": "Slime Spray (Magma)"
+		},
+		"spell_slime_tar": {
+			"name": "Slime Spray (Tar)"
+		},
+		"spell_slime_metal": {
+			"name": "Slime Spray (Metal)"
 		}
     }
 }

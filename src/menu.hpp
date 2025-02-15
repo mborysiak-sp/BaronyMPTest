@@ -292,12 +292,14 @@ void revertResolution();
 
 class Stat;
 int isCharacterValidFromDLC(Stat& myStats, int characterClass);
+int isCharacterValidFromDLC(int player, int characterClass, int race, int appearance);
 
 // handle intro stage stuff
 void doQuitGame();
 void doNewGame(bool makeHighscore);
 void doCredits();
-void doEndgame(bool saveHighscore);
+void doEndgame(bool saveHighscore, bool onServerDisconnect);
+void doEndgameOnDisconnect();
 void doIntro();
 void doEndgameHerx();
 void doEndgameDevil();

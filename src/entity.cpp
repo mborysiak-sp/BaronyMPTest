@@ -45,6 +45,7 @@ Construct an Entity
 
 -------------------------------------------------------------------------------*/
 
+ConsoleVariable<int> cvar_entity_bodypart_sync_tick("/entity_bodypart_sync_tick", TICKS_PER_SECOND / 4);
 Entity::Entity(Sint32 in_sprite, Uint32 pos, list_t* entlist, list_t* creaturelist) :
 	lightBonus(0.f),
 	chanceToPutOutFire(skill[37]),
@@ -63,6 +64,7 @@ Entity::Entity(Sint32 in_sprite, Uint32 pos, list_t* entlist, list_t* creatureli
 	chestHasVampireBook(skill[11]),
 	chestLockpickHealth(skill[12]),
 	chestOldHealth(skill[15]),
+	chestMimicChance(skill[16]),
 	char_gonnavomit(skill[26]),
 	char_heal(skill[22]),
 	char_energize(skill[23]),
@@ -108,6 +110,7 @@ Entity::Entity(Sint32 in_sprite, Uint32 pos, list_t* entlist, list_t* creatureli
 	monsterWeaponYaw(fskill[5]),
 	monsterShadowInitialMimic(skill[34]),
 	monsterShadowDontChangeName(skill[35]),
+	monsterSlimeLastAttack(skill[34]),
 	monsterLichFireMeleeSeq(skill[34]),
 	monsterLichFireMeleePrev(skill[35]),
 	monsterLichIceCastSeq(skill[34]),
@@ -123,6 +126,7 @@ Entity::Entity(Sint32 in_sprite, Uint32 pos, list_t* entlist, list_t* creatureli
 	monsterPathBoundaryXEnd(skill[16]),
 	monsterPathBoundaryYEnd(skill[17]),
 	monsterStoreType(skill[18]),
+	monsterDevilNumSummons(skill[18]),
 	monsterStrafeDirection(skill[39]),
 	monsterPathCount(skill[38]),
 	monsterAllyIndex(skill[42]),
@@ -160,6 +164,7 @@ Entity::Entity(Sint32 in_sprite, Uint32 pos, list_t* entlist, list_t* creatureli
 	itemReceivedDetailsFromServer(skill[25]),
 	itemAutoSalvageByPlayer(skill[26]),
 	itemSplooshed(skill[27]),
+	itemContainer(skill[29]),
 	itemWaterBob(fskill[2]),
 	gateInit(skill[1]),
 	gateStatus(skill[3]),
@@ -258,6 +263,7 @@ Entity::Entity(Sint32 in_sprite, Uint32 pos, list_t* entlist, list_t* creatureli
 	shrineZ(skill[8]),
 	shrineDestXOffset(skill[9]),
 	shrineDestYOffset(skill[10]),
+	shrineDaedalusState(skill[11]),
 	ceilingTileModel(skill[0]),
 	ceilingTileDir(skill[1]),
 	ceilingTileAllowTrap(skill[3]),
@@ -289,6 +295,9 @@ Entity::Entity(Sint32 in_sprite, Uint32 pos, list_t* entlist, list_t* creatureli
 	colliderCurrentHP(skill[12]),
 	colliderOldHP(skill[13]),
 	colliderInit(skill[14]),
+	colliderContainedEntity(skill[15]),
+	colliderHideMonster(skill[16]),
+	colliderKillerUid(skill[17]),
 	furnitureType(skill[0]),
 	furnitureInit(skill[1]),
 	furnitureDir(skill[3]),
@@ -323,6 +332,7 @@ Entity::Entity(Sint32 in_sprite, Uint32 pos, list_t* entlist, list_t* creatureli
 	actmagicOrbitStationaryX(fskill[4]),
 	actmagicOrbitStationaryY(fskill[5]),
 	actmagicOrbitStationaryCurrentDist(fskill[6]),
+	actmagicSprayGravity(fskill[7]),
 	actmagicOrbitStationaryHitTarget(skill[14]),
 	actmagicOrbitHitTargetUID1(skill[15]),
 	actmagicOrbitHitTargetUID2(skill[16]),
@@ -334,9 +344,14 @@ Entity::Entity(Sint32 in_sprite, Uint32 pos, list_t* entlist, list_t* creatureli
 	actmagicCastByTinkerTrap(skill[22]),
 	actmagicTinkerTrapFriendlyFire(skill[23]),
 	actmagicReflectionCount(skill[25]),
+	actmagicFromSpellbook(skill[26]),
+	actmagicSpray(skill[27]),
+	actmagicEmitter(skill[29]),
 	goldAmount(skill[0]),
 	goldAmbience(skill[1]),
 	goldSokoban(skill[2]),
+	goldBouncing(skill[3]),
+	goldInContainer(skill[4]),
 	interactedByMonster(skill[47]),
 	highlightForUI(fskill[29]),
 	highlightForUIGlow(fskill[28]),
@@ -367,12 +382,15 @@ Entity::Entity(Sint32 in_sprite, Uint32 pos, list_t* entlist, list_t* creatureli
 	signalTimerRepeatCount(skill[3]),
 	signalTimerLatchInput(skill[4]),
 	signalInputDirection(skill[5]),
+	signalGateANDPowerCount(skill[9]),
+	signalInvertOutput(skill[10]),
 	effectPolymorph(skill[50]),
 	effectShapeshift(skill[53]),
 	entityShowOnMap(skill[59]),
 	thrownProjectilePower(skill[19]),
 	thrownProjectileCharge(skill[20]),
 	playerStartDir(skill[1]),
+	pressurePlateTriggerType(skill[3]),
 	worldTooltipAlpha(fskill[0]),
 	worldTooltipZ(fskill[1]),
 	worldTooltipActive(skill[0]),
@@ -395,9 +413,13 @@ Entity::Entity(Sint32 in_sprite, Uint32 pos, list_t* entlist, list_t* creatureli
 	{
 		mynode = list_AddNodeLast(entlist);
 	}
-	mynode->element = this;
-	mynode->deconstructor = &entityDeconstructor;
-	mynode->size = sizeof(Entity);
+
+	if ( mynode )
+	{
+		mynode->element = this;
+		mynode->deconstructor = &entityDeconstructor;
+		mynode->size = sizeof(Entity);
+	}
 
 	myCreatureListNode = nullptr;
 	if ( creaturelist )
@@ -462,11 +484,11 @@ Entity::Entity(Sint32 in_sprite, Uint32 pos, list_t* entlist, list_t* creatureli
 		fskill[c] = 0;
 	}
 	skill[2] = -1;
-	for ( c = 0; c < 16; c++ )
+	for ( c = 0; c < 24; c++ )
 	{
 		flags[c] = false;
 	}
-	if ( entlist == map.entities )
+	if ( entlist != nullptr && entlist == map.entities )
 	{
 		if ( multiplayer != CLIENT || loading )
 		{
@@ -551,10 +573,18 @@ Entity::~Entity()
 		myTileListNode = nullptr;
 	}
 
+#ifdef USE_FMOD
+	if ( entity_sound )
+	{
+		entity_sound->stop();
+		entity_sound = nullptr;
+	}
+#endif
+
 	// alert clients of the entity's deletion
 	if ( multiplayer == SERVER && !loading )
 	{
-		if ( mynode->list == map.entities && uid != 0 && flags[NOUPDATE] == false )
+		if ( mynode && mynode->list == map.entities && uid != 0 && flags[NOUPDATE] == false )
 		{
 			for ( i = 1; i < MAXPLAYERS; ++i )
 			{
@@ -592,15 +622,18 @@ Entity::~Entity()
 	// set appropriate player pointer to NULL
 	for ( i = 0; i < MAXPLAYERS; ++i )
 	{
-		if ( this == players[i]->entity )
+		if ( players[i] )
 		{
-			players[i]->entity = nullptr;    //TODO: PLAYERSWAP VERIFY. Should this do anything to the player itself?
-			players[i]->cleanUpOnEntityRemoval();
-		}
-		if ( this == players[i]->ghost.my )
-		{
-			players[i]->ghost.my = nullptr;
-			players[i]->ghost.reset();
+			if ( this == players[i]->entity )
+			{
+				players[i]->entity = nullptr;    //TODO: PLAYERSWAP VERIFY. Should this do anything to the player itself?
+				players[i]->cleanUpOnEntityRemoval();
+			}
+			if ( this == players[i]->ghost.my )
+			{
+				players[i]->ghost.my = nullptr;
+				players[i]->ghost.reset();
+			}
 		}
 	}
 	// destroy my children
@@ -658,6 +691,8 @@ void Entity::killedByMonsterObituary(Entity* victim)
 	{
 	    return;
 	}
+
+	hitstats->killer_uid = this->getUID();
 
 	if ( behavior == &actMagicTrap )
 	{
@@ -831,6 +866,12 @@ void Entity::killedByMonsterObituary(Entity* victim)
 				break;
 			case MIMIC:
 				victim->setObituary(Language::get(2166));
+				break;
+			case BAT_SMALL:
+				victim->setObituary(Language::get(6254));
+				break;
+			case BUGBEAR:
+				victim->setObituary(Language::get(6255));
 				break;
 			default:
 				victim->setObituary(Language::get(1500));
@@ -1258,12 +1299,18 @@ void Entity::effectTimes()
 							if ( caster )
 							{
 								//Deduct mana from caster. Cancel spell if not enough mana (simply leave sustained at false).
+								int oldMP = caster->getMP();
 								bool deducted = caster->safeConsumeMP(1); //Consume 1 mana ever duration / mana seconds
 								if ( deducted )
 								{
 									sustained = true;
 									myStats->EFFECTS[c] = true;
 									myStats->EFFECTS_TIMERS[c] = invisibility_hijacked->channel_duration;
+
+									if ( caster->behavior == &actPlayer )
+									{
+										players[caster->skill[2]]->mechanics.sustainedSpellIncrementMP(oldMP - caster->getMP());
+									}
 								}
 								else
 								{
@@ -1318,6 +1365,15 @@ void Entity::effectTimes()
 					case EFF_POTION_STR:
 						messagePlayer(player, MESSAGE_STATUS, Language::get(3355));
 						break;
+					case EFF_AGILITY:
+						messagePlayer(player, MESSAGE_STATUS, Language::get(6289));
+						break;
+					case EFF_CON_BONUS:
+						messagePlayer(player, MESSAGE_STATUS, Language::get(6288));
+						break;
+					case EFF_PWR:
+						messagePlayer(player, MESSAGE_STATUS, Language::get(6290));
+						break;
 					case EFF_LEVITATING:
 						; //To make the compiler shut up: "error: a label can only be part of a statement and a declaration is not a statement"
 						dissipate = true; //Remove the effect by default.
@@ -1328,12 +1384,18 @@ void Entity::effectTimes()
 							if ( caster )
 							{
 								//Deduct mana from caster. Cancel spell if not enough mana (simply leave sustained at false).
+								int oldMP = caster->getMP();
 								bool deducted = caster->safeConsumeMP(1); //Consume 1 mana ever duration / mana seconds
 								if ( deducted )
 								{
 									sustained = true;
 									myStats->EFFECTS[c] = true;
 									myStats->EFFECTS_TIMERS[c] = levitation_hijacked->channel_duration;
+
+									if ( caster->behavior == &actPlayer )
+									{
+										players[caster->skill[2]]->mechanics.sustainedSpellIncrementMP(oldMP - caster->getMP());
+									}
 								}
 								else
 								{
@@ -1363,7 +1425,7 @@ void Entity::effectTimes()
 						}
 						break;
 					case EFF_NAUSEA_PROTECTION:
-						if ( myStats->mask != nullptr && myStats->mask->type == MASK_PLAGUE
+						if ( myStats->mask != nullptr && (myStats->mask->type == MASK_PLAGUE )
 							&& !(myStats->type != HUMAN && effectShapeshift != NOTHING) )
 						{
 							// don't play any messages since we'll reset the counter in due time.
@@ -1462,12 +1524,18 @@ void Entity::effectTimes()
 							if ( caster )
 							{
 								//Deduct mana from caster. Cancel spell if not enough mana (simply leave sustained at false).
+								int oldMP = caster->getMP();
 								bool deducted = caster->safeConsumeMP(1); //Consume 1 mana ever duration / mana seconds
 								if ( deducted )
 								{
 									sustained = true;
 									myStats->EFFECTS[c] = true;
 									myStats->EFFECTS_TIMERS[c] = reflectMagic_hijacked->channel_duration;
+
+									if ( caster->behavior == &actPlayer )
+									{
+										players[caster->skill[2]]->mechanics.sustainedSpellIncrementMP(oldMP - caster->getMP());
+									}
 								}
 								else
 								{
@@ -1504,12 +1572,18 @@ void Entity::effectTimes()
 							if ( caster )
 							{
 								//Deduct mana from caster. Cancel spell if not enough mana (simply leave sustained at false).
+								int oldMP = caster->getMP();
 								bool deducted = caster->safeConsumeMP(1); //Consume 1 mana ever duration / mana seconds
 								if ( deducted )
 								{
 									sustained = true;
 									myStats->EFFECTS[c] = true;
 									myStats->EFFECTS_TIMERS[c] = amplifyMagic_hijacked->channel_duration;
+
+									if ( caster->behavior == &actPlayer )
+									{
+										players[caster->skill[2]]->mechanics.sustainedSpellIncrementMP(oldMP - caster->getMP());
+									}
 								}
 								else
 								{
@@ -1545,12 +1619,18 @@ void Entity::effectTimes()
 							if ( caster )
 							{
 								//Deduct mana from caster. Cancel spell if not enough mana (simply leave sustained at false).
+								int oldMP = caster->getMP();
 								bool deducted = caster->safeConsumeMP(1); //Consume 3 mana ever duration / mana seconds
 								if ( deducted )
 								{
 									sustained = true;
 									myStats->EFFECTS[c] = true;
 									myStats->EFFECTS_TIMERS[c] = vampiricAura_hijacked->channel_duration;
+
+									if ( caster->behavior == &actPlayer )
+									{
+										players[caster->skill[2]]->mechanics.sustainedSpellIncrementMP(oldMP - caster->getMP());
+									}
 
 									// monsters have a chance to un-sustain the spell each MP consume.
 									if ( caster->behavior == &actMonster && local_rng.rand() % 20 == 0 )
@@ -1797,7 +1877,7 @@ bool Entity::increaseSkill(int skill, bool notify)
 			}
 		}
 
-		if ( player >= 0 && stats[player]->playerRace == RACE_GOBLIN && stats[player]->appearance == 0
+		if ( player >= 0 && stats[player]->playerRace == RACE_GOBLIN && stats[player]->stat_appearance == 0
 			&& myStats->getProficiency(skill) == 100 )
 		{
 			switch ( skill )
@@ -1847,6 +1927,35 @@ bool Entity::increaseSkill(int skill, bool notify)
 			}
 		}
 		myStats->EXP += 2;
+
+		if ( player >= 0 )
+		{
+			Compendium_t::Events_t::eventUpdateCodex(player, Compendium_t::CPDM_XP_MAX_IN_FLOOR, "xp", 2, false, -1, true);
+			Compendium_t::Events_t::eventUpdateCodex(player, Compendium_t::CPDM_XP_MAX_INSTANCE, "xp", 2);
+			Compendium_t::Events_t::eventUpdateCodex(player, Compendium_t::CPDM_XP_SKILLS, "xp", 2);
+
+			const char* skillstr = Compendium_t::getSkillStringForCompendium(skill);
+			if ( strcmp(skillstr, "") )
+			{
+				if ( myStats->getProficiency(skill) == 100 )
+				{
+					Compendium_t::Events_t::eventUpdateCodex(player, Compendium_t::CPDM_CLASS_SKILL_LEGENDS, skillstr, 1);
+				}
+				if ( myStats->getProficiency(skill) == 20 )
+				{
+					Compendium_t::Events_t::eventUpdateCodex(player, Compendium_t::CPDM_CLASS_SKILL_NOVICES, skillstr, 1);
+				}
+				Compendium_t::Events_t::eventUpdateCodex(player, Compendium_t::CPDM_CLASS_SKILL_UPS, skillstr, 1);
+				Compendium_t::Events_t::eventUpdateCodex(player, Compendium_t::CPDM_CLASS_SKILL_UPS_RUN_MAX, skillstr, 1);
+				Compendium_t::Events_t::eventUpdateCodex(player, Compendium_t::CPDM_CLASS_SKILL_MAX, skillstr, myStats->getProficiency(skill));
+			}
+			if ( skill == PRO_STEALTH )
+			{
+				Compendium_t::Events_t::eventUpdateCodex(player, Compendium_t::CPDM_CLASS_SNEAK_SKILLUP_FLOOR, "sneaking", 1, false, -1, true);
+			}
+			Compendium_t::Events_t::eventUpdateCodex(player, Compendium_t::CPDM_CLASS_SKILL_UPS_ALL_RUN, "skills", 1);
+		}
+
 		increased = true;
 	}
 
@@ -1886,8 +1995,8 @@ bool Entity::increaseSkill(int skill, bool notify)
 		net_packet->data[8] = (Sint8)myStats->INT;
 		net_packet->data[9] = (Sint8)myStats->PER;
 		net_packet->data[10] = (Sint8)myStats->CHR;
-		net_packet->data[11] = (Sint8)myStats->EXP;
-		net_packet->data[12] = (Sint8)myStats->LVL;
+		net_packet->data[11] = (Uint8)myStats->EXP;
+		net_packet->data[12] = (Uint8)myStats->LVL;
 		SDLNet_Write16((Sint16)myStats->HP, &net_packet->data[13]);
 		SDLNet_Write16((Sint16)myStats->MAXHP, &net_packet->data[15]);
 		SDLNet_Write16((Sint16)myStats->MP, &net_packet->data[17]);
@@ -2411,7 +2520,16 @@ void Entity::modHP(int amount)
 		return;
 	}
 
+	Sint32 oldHP = entitystats->HP;
 	this->setHP(entitystats->HP + amount);
+	if ( oldHP > entitystats->HP )
+	{
+		if ( behavior == &actPlayer )
+		{
+			Compendium_t::Events_t::eventUpdateCodex(skill[2], Compendium_t::CPDM_HP_LOST_RUN, "hp", oldHP - entitystats->HP);
+			Compendium_t::Events_t::eventUpdateCodex(skill[2], Compendium_t::CPDM_HP_LOST_TOTAL, "hp", oldHP - entitystats->HP);
+		}
+	}
 }
 
 /*-------------------------------------------------------------------------------
@@ -2527,6 +2645,7 @@ void Entity::drainMP(int amount, bool notifyOverexpend)
 	}
 
 	int overdrawn = 0;
+	Sint32 oldMP = entitystats->MP;
 	entitystats->MP -= amount;
 	int player = -1;
 	for ( int i = 0; i < MAXPLAYERS; ++i )
@@ -2537,7 +2656,7 @@ void Entity::drainMP(int amount, bool notifyOverexpend)
 		}
 	}
 
-	if ( player >= 0 && entitystats->playerRace == RACE_INSECTOID && entitystats->appearance == 0 )
+	if ( player >= 0 && entitystats->playerRace == RACE_INSECTOID && entitystats->stat_appearance == 0 )
 	{
 		if ( svFlags & SV_FLAG_HUNGER )
 		{
@@ -2594,6 +2713,12 @@ void Entity::drainMP(int amount, bool notifyOverexpend)
 			net_packet->len = 13;
 			sendPacketSafe(net_sock, -1, net_packet, 0);
 		}
+	}
+
+	if ( player >= 0 )
+	{
+		Compendium_t::Events_t::eventUpdateCodex(player, Compendium_t::CPDM_MP_SPENT_RUN, "mp", oldMP - entitystats->MP);
+		Compendium_t::Events_t::eventUpdateCodex(player, Compendium_t::CPDM_MP_SPENT_TOTAL, "mp", oldMP - entitystats->MP);
 	}
 
 	if ( overdrawn < 0 )
@@ -2655,7 +2780,7 @@ bool Entity::safeConsumeMP(int amount)
 	}
 	else
 	{
-		if ( behavior == &actPlayer && stat->playerRace == RACE_INSECTOID && stat->appearance == 0 )
+		if ( behavior == &actPlayer && stat->playerRace == RACE_INSECTOID && stat->stat_appearance == 0 )
 		{
 			if ( svFlags & SV_FLAG_HUNGER )
 			{
@@ -2672,6 +2797,11 @@ bool Entity::safeConsumeMP(int amount)
 					}
 				}
 			}
+		}
+		if ( behavior == &actPlayer )
+		{
+			Compendium_t::Events_t::eventUpdateCodex(skill[2], Compendium_t::CPDM_MP_SPENT_RUN, "mp", amount);
+			Compendium_t::Events_t::eventUpdateCodex(skill[2], Compendium_t::CPDM_MP_SPENT_TOTAL, "mp", amount);
 		}
 		this->modMP(-amount);
 		return true;
@@ -2742,7 +2872,8 @@ int Entity::getHungerTickRate(Stat* myStats, bool isPlayer, bool checkItemsEffec
 		|| !strncmp(map.name, "Boss", 4)
 		|| !strncmp(map.name, "Hell Boss", 9)
 		|| !strncmp(map.name, "Mages Guild", 11)
-		|| strstr(map.name, " Transition") )
+		|| strstr(map.name, " Transition")
+		|| currentlevel == 0 )
 	{
 		hungerring = 1; // slow down hunger on boss stages.
 		if ( vampiricHunger > 0 )
@@ -2875,6 +3006,74 @@ void Entity::handleEffects(Stat* myStats)
 				myStats->HP = 1;
 			}
 		}
+
+		if ( myStats->defending )
+		{
+			if ( myStats->shield && !myStats->EFFECTS[EFF_SHAPESHIFT] )
+			{
+				if ( players[player]->mechanics.defendTicks == 0 )
+				{
+					players[player]->mechanics.defendTicks = ::ticks;
+				}
+			}
+			else
+			{
+				players[player]->mechanics.defendTicks = 0;
+			}
+		}
+		else
+		{
+			players[player]->mechanics.defendTicks = 0;
+		}
+	}
+
+	if ( myStats->HP > 0 )
+	{
+		int maxHPMod = 0;
+		int maxMPMod = 0;
+		bool updateHPMPForClients = false;
+		if ( myStats->ring && myStats->ring->type == RING_RESOLVE )
+		{
+			maxHPMod += 10;
+			maxMPMod += 10;
+			if ( myStats->ring->beatitude >= 0 || shouldInvertEquipmentBeatitude(myStats) )
+			{
+				maxHPMod += 10 * std::min(2, (int)abs(myStats->ring->beatitude));
+				maxMPMod += 10 * std::min(2, (int)abs(myStats->ring->beatitude));
+			}
+		}
+
+		if ( maxHPMod != myStats->MISC_FLAGS[STAT_FLAG_HP_BONUS] )
+		{
+			real_t oldRatio = myStats->HP / (real_t)myStats->MAXHP;
+			myStats->MAXHP += (maxHPMod - myStats->MISC_FLAGS[STAT_FLAG_HP_BONUS]);
+			myStats->MAXHP = std::max(1, myStats->MAXHP);
+			myStats->OLDHP = std::max(1, (int)(myStats->MAXHP * oldRatio));
+
+			if ( behavior != &actPlayer )
+			{
+				setHP(myStats->OLDHP);
+			}
+			else
+			{
+				myStats->HP = myStats->OLDHP;
+				updateHPMPForClients = true;
+			}
+		}
+		myStats->MISC_FLAGS[STAT_FLAG_HP_BONUS] = maxHPMod;
+		if ( maxMPMod != myStats->MISC_FLAGS[STAT_FLAG_MP_BONUS] )
+		{
+			real_t oldRatio = myStats->MP / (real_t)myStats->MAXMP;
+			myStats->MAXMP += (maxMPMod - myStats->MISC_FLAGS[STAT_FLAG_MP_BONUS]);
+			myStats->MAXMP = std::max(1, myStats->MAXMP);
+			setMP(std::max(1, (int)(myStats->MAXMP * oldRatio)), false);
+			updateHPMPForClients = true;
+		}
+		myStats->MISC_FLAGS[STAT_FLAG_MP_BONUS] = maxMPMod;
+		if ( updateHPMPForClients )
+		{
+			serverUpdatePlayerStats();
+		}
 	}
 
 	auto& camera_shakex = cameravars[player >= 0 ? player : 0].shakex;
@@ -2918,7 +3117,17 @@ void Entity::handleEffects(Stat* myStats)
 	if ( myStats->EXP >= 100 )
 	{
 		myStats->EXP -= 100;
-		myStats->LVL++;
+		if ( player >= 0 )
+		{
+			if ( myStats->LVL < 255 )
+			{
+				myStats->LVL++;
+			}
+		}
+		else
+		{
+			myStats->LVL++;
+		}
 
 		if ( player >= 0 && players[player]->isLocalPlayer() )
 		{
@@ -2939,9 +3148,9 @@ void Entity::handleEffects(Stat* myStats)
 		{
 			myStats->MP += MP_MOD;
 			myStats->MAXMP += MP_MOD;
-			if ( behavior == &actPlayer && myStats->playerRace == RACE_INSECTOID && myStats->appearance == 0 )
+			if ( behavior == &actPlayer && myStats->playerRace == RACE_INSECTOID && myStats->stat_appearance == 0 )
 			{
-				myStats->MAXMP = std::min(50, myStats->MAXMP);
+				myStats->MAXMP = std::min(100, myStats->MAXMP);
 				if ( svFlags & SV_FLAG_HUNGER )
 				{
 					Sint32 hungerPointPerMana = playerInsectoidHungerValueOfManaPoint(*myStats);
@@ -2959,6 +3168,8 @@ void Entity::handleEffects(Stat* myStats)
 		{
 			// players only.
 			this->playerStatIncrease(client_classes[player], increasestat);
+			Compendium_t::Events_t::eventUpdateCodex(player, Compendium_t::CPDM_CLASS_LVL_GAINED, "leveling up", 1);
+			Compendium_t::Events_t::eventUpdateCodex(player, Compendium_t::CPDM_CLASS_LVL_MAX, "leveling up", myStats->LVL);
 		}
 		else if ( behavior == &actMonster && monsterAllySummonRank != 0 )
 		{
@@ -3138,100 +3349,173 @@ void Entity::handleEffects(Stat* myStats)
 				switch ( increasestat[i] )
 				{
 					case STAT_STR: // STR
-						StatUps.push_back(LevelUpAnimation_t::LevelUp_t::StatUp_t(increasestat[i], myStats->STR, 1));
-						myStats->STR++;
-						myStats->PLAYER_LVL_STAT_TIMER[increasestat[i]] = statIconTicks;
-						if ( myStats->PLAYER_LVL_STAT_BONUS[increasestat[i]] >= PRO_LOCKPICKING && !rolledBonusStat )
+					{
+						if ( myStats->STR < MAX_PLAYER_STAT_VALUE )
 						{
-							if ( local_rng.rand() % 5 == 0 )
+							StatUps.push_back(LevelUpAnimation_t::LevelUp_t::StatUp_t(increasestat[i], myStats->STR, 1));
+							int increment = 1;
+							myStats->PLAYER_LVL_STAT_TIMER[increasestat[i]] = statIconTicks;
+							if ( myStats->PLAYER_LVL_STAT_BONUS[increasestat[i]] >= PRO_LOCKPICKING && !rolledBonusStat )
 							{
-								StatUps.at(StatUps.size() - 1).increaseStat += 1;
-								myStats->STR++;
-								rolledBonusStat = true;
-								myStats->PLAYER_LVL_STAT_TIMER[increasestat[i] + NUMSTATS] = statIconTicks;
-								//messagePlayer(0, "Rolled bonus in %d", increasestat[i]);
+								if ( local_rng.rand() % 5 == 0 )
+								{
+									if ( (myStats->STR + 1) < MAX_PLAYER_STAT_VALUE )
+									{
+										StatUps.at(StatUps.size() - 1).increaseStat += 1;
+										increment++;
+										Compendium_t::Events_t::eventUpdateCodex(player, Compendium_t::CPDM_STAT_DOUBLED, "str", 1);
+										rolledBonusStat = true;
+										myStats->PLAYER_LVL_STAT_TIMER[increasestat[i] + NUMSTATS] = statIconTicks;
+										//messagePlayer(0, "Rolled bonus in %d", increasestat[i]);
+									}
+								}
 							}
+							myStats->STR += increment;
+							Compendium_t::Events_t::eventUpdateCodex(player, Compendium_t::CPDM_STAT_INCREASES, "str", 1);
+							Compendium_t::Events_t::eventUpdateCodex(player, Compendium_t::CPDM_CLASS_STAT_STR_MAX, "str", myStats->STR);
 						}
 						break;
+					}
 					case STAT_DEX: // DEX
-						StatUps.push_back(LevelUpAnimation_t::LevelUp_t::StatUp_t(increasestat[i], myStats->DEX, 1));
-						myStats->DEX++;
-						myStats->PLAYER_LVL_STAT_TIMER[increasestat[i]] = statIconTicks;
-						if ( myStats->PLAYER_LVL_STAT_BONUS[increasestat[i]] >= PRO_LOCKPICKING && !rolledBonusStat )
+					{
+						if ( myStats->DEX < MAX_PLAYER_STAT_VALUE )
 						{
-							if ( local_rng.rand() % 5 == 0 )
+							StatUps.push_back(LevelUpAnimation_t::LevelUp_t::StatUp_t(increasestat[i], myStats->DEX, 1));
+							int increment = 1;
+							myStats->PLAYER_LVL_STAT_TIMER[increasestat[i]] = statIconTicks;
+							if ( myStats->PLAYER_LVL_STAT_BONUS[increasestat[i]] >= PRO_LOCKPICKING && !rolledBonusStat )
 							{
-								StatUps.at(StatUps.size() - 1).increaseStat += 1;
-								myStats->DEX++;
-								rolledBonusStat = true;
-								myStats->PLAYER_LVL_STAT_TIMER[increasestat[i] + NUMSTATS] = statIconTicks;
-								//messagePlayer(0, "Rolled bonus in %d", increasestat[i]);
+								if ( local_rng.rand() % 5 == 0 )
+								{
+									if ( (myStats->DEX + 1) < MAX_PLAYER_STAT_VALUE )
+									{
+										StatUps.at(StatUps.size() - 1).increaseStat += 1;
+										increment++;
+										Compendium_t::Events_t::eventUpdateCodex(player, Compendium_t::CPDM_STAT_DOUBLED, "dex", 1);
+										rolledBonusStat = true;
+										myStats->PLAYER_LVL_STAT_TIMER[increasestat[i] + NUMSTATS] = statIconTicks;
+										//messagePlayer(0, "Rolled bonus in %d", increasestat[i]);
+									}
+								}
 							}
+							myStats->DEX += increment;
+							Compendium_t::Events_t::eventUpdateCodex(player, Compendium_t::CPDM_STAT_INCREASES, "dex", increment);
+							Compendium_t::Events_t::eventUpdateCodex(player, Compendium_t::CPDM_CLASS_STAT_DEX_MAX, "dex", myStats->DEX);
 						}
 						break;
+					}
 					case STAT_CON: // CON
-						StatUps.push_back(LevelUpAnimation_t::LevelUp_t::StatUp_t(increasestat[i], myStats->CON, 1));
-						myStats->CON++;
-						myStats->PLAYER_LVL_STAT_TIMER[increasestat[i]] = statIconTicks;
-						if ( myStats->PLAYER_LVL_STAT_BONUS[increasestat[i]] >= PRO_LOCKPICKING && !rolledBonusStat )
+					{
+						if ( myStats->CON < MAX_PLAYER_STAT_VALUE )
 						{
-							if ( local_rng.rand() % 5 == 0 )
+							StatUps.push_back(LevelUpAnimation_t::LevelUp_t::StatUp_t(increasestat[i], myStats->CON, 1));
+							int increment = 1;
+							myStats->PLAYER_LVL_STAT_TIMER[increasestat[i]] = statIconTicks;
+							if ( myStats->PLAYER_LVL_STAT_BONUS[increasestat[i]] >= PRO_LOCKPICKING && !rolledBonusStat )
 							{
-								StatUps.at(StatUps.size() - 1).increaseStat += 1;
-								myStats->CON++;
-								rolledBonusStat = true;
-								myStats->PLAYER_LVL_STAT_TIMER[increasestat[i] + NUMSTATS] = statIconTicks;
-								//messagePlayer(0, "Rolled bonus in %d", increasestat[i]);
+								if ( local_rng.rand() % 5 == 0 )
+								{
+									if ( (myStats->CON + 1) < MAX_PLAYER_STAT_VALUE )
+									{
+										StatUps.at(StatUps.size() - 1).increaseStat += 1;
+										increment++;
+										Compendium_t::Events_t::eventUpdateCodex(player, Compendium_t::CPDM_STAT_DOUBLED, "con", 1);
+										rolledBonusStat = true;
+										myStats->PLAYER_LVL_STAT_TIMER[increasestat[i] + NUMSTATS] = statIconTicks;
+										//messagePlayer(0, "Rolled bonus in %d", increasestat[i]);
+									}
+								}
 							}
+							myStats->CON += increment;
+							Compendium_t::Events_t::eventUpdateCodex(player, Compendium_t::CPDM_STAT_INCREASES, "con", increment);
+							Compendium_t::Events_t::eventUpdateCodex(player, Compendium_t::CPDM_CLASS_STAT_CON_MAX, "con", myStats->CON);
 						}
 						break;
+					}
 					case STAT_INT: // INT
-						StatUps.push_back(LevelUpAnimation_t::LevelUp_t::StatUp_t(increasestat[i], myStats->INT, 1));
-						myStats->INT++;
-						myStats->PLAYER_LVL_STAT_TIMER[increasestat[i]] = statIconTicks;
-						if ( myStats->PLAYER_LVL_STAT_BONUS[increasestat[i]] >= PRO_LOCKPICKING && !rolledBonusStat )
+					{
+						if ( myStats->INT < MAX_PLAYER_STAT_VALUE )
 						{
-							if ( local_rng.rand() % 5 == 0 )
+							StatUps.push_back(LevelUpAnimation_t::LevelUp_t::StatUp_t(increasestat[i], myStats->INT, 1));
+							int increment = 1;
+							myStats->PLAYER_LVL_STAT_TIMER[increasestat[i]] = statIconTicks;
+							if ( myStats->PLAYER_LVL_STAT_BONUS[increasestat[i]] >= PRO_LOCKPICKING && !rolledBonusStat )
 							{
-								StatUps.at(StatUps.size() - 1).increaseStat += 1;
-								myStats->INT++;
-								rolledBonusStat = true;
-								myStats->PLAYER_LVL_STAT_TIMER[increasestat[i] + NUMSTATS] = statIconTicks;
-								//messagePlayer(0, "Rolled bonus in %d", increasestat[i]);
+								if ( local_rng.rand() % 5 == 0 )
+								{
+									if ( (myStats->INT + 1) < MAX_PLAYER_STAT_VALUE )
+									{
+										StatUps.at(StatUps.size() - 1).increaseStat += 1;
+										increment++;
+										Compendium_t::Events_t::eventUpdateCodex(player, Compendium_t::CPDM_STAT_DOUBLED, "int", 1);
+										rolledBonusStat = true;
+										myStats->PLAYER_LVL_STAT_TIMER[increasestat[i] + NUMSTATS] = statIconTicks;
+										//messagePlayer(0, "Rolled bonus in %d", increasestat[i]);
+									}
+								}
 							}
+							myStats->INT += increment;
+							Compendium_t::Events_t::eventUpdateCodex(player, Compendium_t::CPDM_STAT_INCREASES, "int", increment);
+							Compendium_t::Events_t::eventUpdateCodex(player, Compendium_t::CPDM_CLASS_STAT_INT_MAX, "int", myStats->INT);
 						}
 						break;
+					}
 					case STAT_PER: // PER
-						StatUps.push_back(LevelUpAnimation_t::LevelUp_t::StatUp_t(increasestat[i], myStats->PER, 1));
-						myStats->PER++;
-						myStats->PLAYER_LVL_STAT_TIMER[increasestat[i]] = statIconTicks;
-						if ( myStats->PLAYER_LVL_STAT_BONUS[increasestat[i]] >= PRO_LOCKPICKING && !rolledBonusStat )
+					{
+						if ( myStats->PER < MAX_PLAYER_STAT_VALUE )
 						{
-							if ( local_rng.rand() % 5 == 0 )
+							StatUps.push_back(LevelUpAnimation_t::LevelUp_t::StatUp_t(increasestat[i], myStats->PER, 1));
+							int increment = 1;
+							myStats->PLAYER_LVL_STAT_TIMER[increasestat[i]] = statIconTicks;
+							if ( myStats->PLAYER_LVL_STAT_BONUS[increasestat[i]] >= PRO_LOCKPICKING && !rolledBonusStat )
 							{
-								StatUps.at(StatUps.size() - 1).increaseStat += 1;
-								myStats->PER++;
-								rolledBonusStat = true;
-								myStats->PLAYER_LVL_STAT_TIMER[increasestat[i] + NUMSTATS] = statIconTicks;
-								//messagePlayer(0, "Rolled bonus in %d", increasestat[i]);
+								if ( local_rng.rand() % 5 == 0 )
+								{
+									if ( (myStats->PER + 1) < MAX_PLAYER_STAT_VALUE )
+									{
+										StatUps.at(StatUps.size() - 1).increaseStat += 1;
+										increment++;
+										rolledBonusStat = true;
+										myStats->PLAYER_LVL_STAT_TIMER[increasestat[i] + NUMSTATS] = statIconTicks;
+										//messagePlayer(0, "Rolled bonus in %d", increasestat[i]);
+									}
+								}
 							}
+							myStats->PER += increment;
+							Compendium_t::Events_t::eventUpdateCodex(player, Compendium_t::CPDM_STAT_INCREASES, "per", increment);
+							Compendium_t::Events_t::eventUpdateCodex(player, Compendium_t::CPDM_CLASS_STAT_PER_MAX, "per", myStats->PER);
 						}
 						break;
+					}
 					case STAT_CHR: // CHR
-						StatUps.push_back(LevelUpAnimation_t::LevelUp_t::StatUp_t(increasestat[i], myStats->CHR, 1));
-						myStats->CHR++;
-						myStats->PLAYER_LVL_STAT_TIMER[increasestat[i]] = statIconTicks;
-						if ( myStats->PLAYER_LVL_STAT_BONUS[increasestat[i]] >= PRO_LOCKPICKING && !rolledBonusStat )
+					{
+						if ( myStats->CHR < MAX_PLAYER_STAT_VALUE )
 						{
-							if ( local_rng.rand() % 5 == 0 )
+							StatUps.push_back(LevelUpAnimation_t::LevelUp_t::StatUp_t(increasestat[i], myStats->CHR, 1));
+							int increment = 1;
+							myStats->PLAYER_LVL_STAT_TIMER[increasestat[i]] = statIconTicks;
+							if ( myStats->PLAYER_LVL_STAT_BONUS[increasestat[i]] >= PRO_LOCKPICKING && !rolledBonusStat )
 							{
-								StatUps.at(StatUps.size() - 1).increaseStat += 1;
-								myStats->CHR++;
-								rolledBonusStat = true;
-								myStats->PLAYER_LVL_STAT_TIMER[increasestat[i] + NUMSTATS] = statIconTicks;
-								//messagePlayer(0, "Rolled bonus in %d", increasestat[i]);
+								if ( local_rng.rand() % 5 == 0 )
+								{
+									if ( (myStats->CHR + 1) < MAX_PLAYER_STAT_VALUE )
+									{
+										StatUps.at(StatUps.size() - 1).increaseStat += 1;
+										increment++;
+										Compendium_t::Events_t::eventUpdateCodex(player, Compendium_t::CPDM_STAT_DOUBLED, "chr", 1);
+										rolledBonusStat = true;
+										myStats->PLAYER_LVL_STAT_TIMER[increasestat[i] + NUMSTATS] = statIconTicks;
+										//messagePlayer(0, "Rolled bonus in %d", increasestat[i]);
+									}
+								}
 							}
+							myStats->CHR += increment;
+							Compendium_t::Events_t::eventUpdateCodex(player, Compendium_t::CPDM_STAT_INCREASES, "chr", increment);
+							Compendium_t::Events_t::eventUpdateCodex(player, Compendium_t::CPDM_CLASS_STAT_CHR_MAX, "chr", myStats->CHR);
 						}
+						break;
+					}
+					default:
 						break;
 				}
 			}
@@ -3268,8 +3552,8 @@ void Entity::handleEffects(Stat* myStats)
 				net_packet->data[8] = (Sint8)myStats->INT;
 				net_packet->data[9] = (Sint8)myStats->PER;
 				net_packet->data[10] = (Sint8)myStats->CHR;
-				net_packet->data[11] = (Sint8)myStats->EXP;
-				net_packet->data[12] = (Sint8)myStats->LVL;
+				net_packet->data[11] = (Uint8)myStats->EXP;
+				net_packet->data[12] = (Uint8)myStats->LVL;
 				SDLNet_Write16((Sint16)myStats->HP, &net_packet->data[13]);
 				SDLNet_Write16((Sint16)myStats->MAXHP, &net_packet->data[15]);
 				SDLNet_Write16((Sint16)myStats->MP, &net_packet->data[17]);
@@ -3428,51 +3712,54 @@ void Entity::handleEffects(Stat* myStats)
 			}
 		}
 	}
-	else if ( ticks % hungerTickRate == 0 )
+	else
 	{
-		//messagePlayer(0, "hungertick %d, curr %d, players: %d", hungerTickRate, myStats->HUNGER, playerCount);
 		if ( myStats->HUNGER > 0 && !playerAutomaton )
 		{
-			myStats->HUNGER--;
-			Sint32 noLongerFull = getEntityHungerInterval(player, this, myStats, HUNGER_INTERVAL_OVERSATIATED);
-			Sint32 youFeelHungry = getEntityHungerInterval(player, this, myStats, HUNGER_INTERVAL_HUNGRY);
-			Sint32 youFeelWeak = getEntityHungerInterval(player, this, myStats, HUNGER_INTERVAL_WEAK);
-			Sint32 youFeelFaint = getEntityHungerInterval(player, this, myStats, HUNGER_INTERVAL_STARVING);
+			if ( ticks % hungerTickRate == 0 )
+			{
+				//messagePlayer(0, "hungertick %d, curr %d, players: %d", hungerTickRate, myStats->HUNGER, playerCount);
+				myStats->HUNGER--;
+				Sint32 noLongerFull = getEntityHungerInterval(player, this, myStats, HUNGER_INTERVAL_OVERSATIATED);
+				Sint32 youFeelHungry = getEntityHungerInterval(player, this, myStats, HUNGER_INTERVAL_HUNGRY);
+				Sint32 youFeelWeak = getEntityHungerInterval(player, this, myStats, HUNGER_INTERVAL_WEAK);
+				Sint32 youFeelFaint = getEntityHungerInterval(player, this, myStats, HUNGER_INTERVAL_STARVING);
 
-			if ( myStats->HUNGER == noLongerFull )
-			{
-				if ( !myStats->EFFECTS[EFF_VOMITING] )
+				if ( myStats->HUNGER == noLongerFull )
 				{
-					messagePlayer(player, MESSAGE_STATUS, Language::get(629));
+					if ( !myStats->EFFECTS[EFF_VOMITING] )
+					{
+						messagePlayer(player, MESSAGE_STATUS, Language::get(629));
+					}
+					serverUpdateHunger(player);
 				}
-				serverUpdateHunger(player);
-			}
-			else if ( myStats->HUNGER == youFeelHungry )
-			{
-				if ( !myStats->EFFECTS[EFF_VOMITING] )
+				else if ( myStats->HUNGER == youFeelHungry )
 				{
-					messagePlayer(player, MESSAGE_STATUS, Language::get(630));
-					playSoundPlayer(player, 32, 128);
+					if ( !myStats->EFFECTS[EFF_VOMITING] )
+					{
+						messagePlayer(player, MESSAGE_STATUS, Language::get(630));
+						playSoundPlayer(player, 32, 128);
+					}
+					serverUpdateHunger(player);
 				}
-				serverUpdateHunger(player);
-			}
-			else if ( myStats->HUNGER == youFeelWeak )
-			{
-				if ( !myStats->EFFECTS[EFF_VOMITING] )
+				else if ( myStats->HUNGER == youFeelWeak )
 				{
-					messagePlayer(player, MESSAGE_STATUS, Language::get(631));
-					playSoundPlayer(player, 32, 128);
+					if ( !myStats->EFFECTS[EFF_VOMITING] )
+					{
+						messagePlayer(player, MESSAGE_STATUS, Language::get(631));
+						playSoundPlayer(player, 32, 128);
+					}
+					serverUpdateHunger(player);
 				}
-				serverUpdateHunger(player);
-			}
-			else if ( myStats->HUNGER == youFeelFaint )
-			{
-				if ( !myStats->EFFECTS[EFF_VOMITING] )
+				else if ( myStats->HUNGER == youFeelFaint )
 				{
-					messagePlayer(player, MESSAGE_STATUS, Language::get(632));
-					playSoundPlayer(player, 32, 128);
+					if ( !myStats->EFFECTS[EFF_VOMITING] )
+					{
+						messagePlayer(player, MESSAGE_STATUS, Language::get(632));
+						playSoundPlayer(player, 32, 128);
+					}
+					serverUpdateHunger(player);
 				}
-				serverUpdateHunger(player);
 			}
 		}
 		else
@@ -3528,7 +3815,8 @@ void Entity::handleEffects(Stat* myStats)
 					}
 					else
 					{
-						this->modHP(-4);
+						int damage = std::max(1, myStats->MAXHP / 20);
+						this->modHP(-damage);
 
 						if ( myStats->HP <= 0 )
 						{
@@ -3588,7 +3876,7 @@ void Entity::handleEffects(Stat* myStats)
 		if ( !(behavior == &actPlayer && effectShapeshift != NOTHING)
 			&& ((getHealthRegenInterval(this, *myStats, behavior == &actPlayer) == -1)
 				|| myStats->type == INSECTOID
-				|| (behavior == &actPlayer && myStats->playerRace == RACE_INSECTOID && myStats->appearance == 0)) )
+				|| (behavior == &actPlayer && myStats->playerRace == RACE_INSECTOID && myStats->stat_appearance == 0)) )
 		{
 			if ( ticks % (HEAL_TIME) == 0 )
 			{
@@ -3751,7 +4039,7 @@ void Entity::handleEffects(Stat* myStats)
 	if ( myStats->mask && myStats->mask->type == MASK_PIPE )
 	{
 		if ( !(behavior == &actPlayer && effectShapeshift != NOTHING)
-			&& !(behavior == &actPlayer && myStats->playerRace == RACE_INSECTOID && myStats->appearance == 0) )
+			&& !(behavior == &actPlayer && myStats->playerRace == RACE_INSECTOID && myStats->stat_appearance == 0) )
 		{
 			if ( myStats->mask->beatitude >= 0 || shouldInvertEquipmentBeatitude(myStats) )
 			{
@@ -3800,25 +4088,31 @@ void Entity::handleEffects(Stat* myStats)
 	// healing over time
 	int healring = 0;
 	int healthRegenInterval = getHealthRegenInterval(this, *myStats, behavior == &actPlayer);
-	if ( healthRegenInterval == -1 && behavior == &actPlayer && myStats->type == SKELETON )
-	{
-		healthRegenInterval = HEAL_TIME * 4;
-	}
 	bool naturalHeal = false;
 	if ( healthRegenInterval >= 0 )
 	{
 		if ( myStats->HP < myStats->MAXHP )
 		{
 			this->char_heal++;
-			if ( (svFlags & SV_FLAG_HUNGER) || behavior == &actMonster || (behavior == &actPlayer && myStats->type == SKELETON) )
+			/*if ( (svFlags & SV_FLAG_HUNGER) || behavior == &actMonster || (behavior == &actPlayer && myStats->type == SKELETON) )*/
 			{
 				if ( this->char_heal >= healthRegenInterval )
 				{
 					this->char_heal = 0;
 					if ( hpMod > 0 )
 					{
+						Sint32 oldHP = myStats->HP;
 						this->modHP(hpMod);
 						naturalHeal = true;
+						if ( behavior == &actPlayer )
+						{
+							if ( oldHP < myStats->HP )
+							{
+								Compendium_t::Events_t::eventUpdateCodex(skill[2], Compendium_t::CPDM_RGN_HP_RUN, "rgn", myStats->HP - oldHP);
+								Compendium_t::Events_t::eventUpdateCodex(skill[2], Compendium_t::CPDM_RGN_HP_SUM, "rgn", myStats->HP - oldHP);
+							}
+							Compendium_t::Events_t::eventUpdateCodex(skill[2], Compendium_t::CPDM_RGN_HP_RATE_MAX, "rgn", healthRegenInterval);
+						}
 					}
 				}
 			}
@@ -3826,6 +4120,41 @@ void Entity::handleEffects(Stat* myStats)
 		else
 		{
 			this->char_heal = 0;
+		}
+	}
+
+	if ( myStats->EFFECTS[EFF_MARIGOLD] && (svFlags & SV_FLAG_HUNGER)
+		&& myStats->EFFECTS_TIMERS[EFF_MARIGOLD] > 0 )
+	{
+		if ( behavior == &actPlayer )
+		{
+			if ( myStats->mask && myStats->mask->type == MASK_MARIGOLD )
+			{
+				int foodMod = 5;
+				if ( myStats->mask->beatitude >= 0 || shouldInvertEquipmentBeatitude(myStats) )
+				{
+					foodMod += 3 * std::min(2, (int)abs(myStats->mask->beatitude));
+				}
+				int interval = std::max(1, (30 * TICKS_PER_SECOND) / foodMod);
+				if ( (myStats->EFFECTS_TIMERS[EFF_MARIGOLD] + 1) % interval == 0 )
+				{
+					if ( myStats->HP < myStats->MAXHP )
+					{
+						Sint32 oldHP = myStats->HP;
+						this->modHP(1);
+						naturalHeal = true;
+						if ( behavior == &actPlayer )
+						{
+							if ( oldHP < myStats->HP )
+							{
+								Compendium_t::Events_t::eventUpdateCodex(skill[2], Compendium_t::CPDM_RGN_HP_RUN, "rgn", myStats->HP - oldHP);
+								Compendium_t::Events_t::eventUpdateCodex(skill[2], Compendium_t::CPDM_RGN_HP_SUM, "rgn", myStats->HP - oldHP);
+							}
+							Compendium_t::Events_t::eventUpdateCodex(skill[2], Compendium_t::CPDM_RGN_HP_RATE_MAX, "rgn", healthRegenInterval);
+						}
+					}
+				}
+			}
 		}
 	}
 
@@ -3900,11 +4229,20 @@ void Entity::handleEffects(Stat* myStats)
 			this->char_energize = 0;
 			if ( mpMod > 0 )
 			{
+				Sint32 oldMP = myStats->MP;
 				this->modMP(mpMod);
+				if ( oldMP < myStats->MP )
+				{
+					if ( behavior == &actPlayer )
+					{
+						Compendium_t::Events_t::eventUpdateCodex(skill[2], Compendium_t::CPDM_RGN_MP_RUN, "rgn", myStats->MP - oldMP);
+						Compendium_t::Events_t::eventUpdateCodex(skill[2], Compendium_t::CPDM_RGN_MP_SUM, "rgn", myStats->MP - oldMP);
+					}
+				}
 			}
 		}
 	}
-	else if ( this->behavior == &actPlayer && myStats->playerRace == RACE_INSECTOID && myStats->appearance == 0 )
+	else if ( this->behavior == &actPlayer && myStats->playerRace == RACE_INSECTOID && myStats->stat_appearance == 0 )
 	{
 		if ( (svFlags & SV_FLAG_HUNGER) && !MFLAG_DISABLEHUNGER )
 		{
@@ -3993,7 +4331,17 @@ void Entity::handleEffects(Stat* myStats)
 				this->char_energize = 0;
 				if ( mpMod > 0 )
 				{
+					Sint32 oldMP = myStats->MP;
 					this->modMP(mpMod);
+					if ( behavior == &actPlayer )
+					{
+						if ( oldMP < myStats->MP )
+						{
+							Compendium_t::Events_t::eventUpdateCodex(skill[2], Compendium_t::CPDM_RGN_MP_RUN, "rgn", myStats->MP - oldMP);
+							Compendium_t::Events_t::eventUpdateCodex(skill[2], Compendium_t::CPDM_RGN_MP_SUM, "rgn", myStats->MP - oldMP);
+						}
+						Compendium_t::Events_t::eventUpdateCodex(skill[2], Compendium_t::CPDM_RGN_MP_RATE_MAX, "rgn", manaRegenInterval);
+					}
 				}
 			}
 		}
@@ -4014,31 +4362,13 @@ void Entity::handleEffects(Stat* myStats)
 		// intended to fix multiplayer duplication.
 		if ( ticks % 70 == 0 || ticks % 130 == 0 ) 
 		{
-			if ( myStats->weapon != NULL 
-				&& (myStats->weapon->beatitude == 0 
-					|| !shouldInvertEquipmentBeatitude(myStats) && myStats->weapon->beatitude > 0
-					|| shouldInvertEquipmentBeatitude(myStats) && myStats->weapon->beatitude < 0)
-				)
+			if ( behavior == &actMonster && myStats->HP > 0 )
 			{
-				messagePlayer(player, MESSAGE_EQUIPMENT, Language::get(636));
-				if ( player >= 0 )
+				if ( myStats->weapon != NULL && itemCategory(myStats->weapon) != SPELLBOOK )
 				{
-					dropItem(myStats->weapon, player);
-					if ( player > 0 && multiplayer == SERVER && !players[player]->isLocalPlayer() )
-					{
-						strcpy((char*)net_packet->data, "DROP");
-						net_packet->data[4] = 5;
-						net_packet->address.host = net_clients[player - 1].host;
-						net_packet->address.port = net_clients[player - 1].port;
-						net_packet->len = 5;
-						sendPacketSafe(net_sock, -1, net_packet, player - 1);
-					}
-				}
-				else
-				{
+					//messagePlayer(player, MESSAGE_EQUIPMENT, Language::get(636));
 					dropItemMonster(myStats->weapon, this, myStats);
 				}
-				myStats->weapon = NULL;
 			}
 		}
 	}
@@ -4584,7 +4914,10 @@ void Entity::handleEffects(Stat* myStats)
 				if ( myStats->cloak != nullptr )
 				{
 					// 1 in 10 chance of dealing damage to Entity's cloak
-					if ( local_rng.rand() % 10 == 0 && myStats->cloak->type != ARTIFACT_CLOAK && myStats->cloak->type != CLOAK_BACKPACK )
+					if ( local_rng.rand() % 10 == 0 
+						&& myStats->cloak->type != ARTIFACT_CLOAK 
+						&& myStats->cloak->type != CLOAK_GUARDIAN
+						&& myStats->cloak->type != CLOAK_BACKPACK )
 					{
 						if ( player >= 0 && players[player]->isLocalPlayer() )
 						{
@@ -4602,6 +4935,8 @@ void Entity::handleEffects(Stat* myStats)
 						else
 						{
 							messagePlayer(player, MESSAGE_EQUIPMENT, Language::get(646), myStats->cloak->getName()); // "Your %s burns to ash!"
+							//Compendium_t::Events_t::eventUpdate(player, Compendium_t::CPDM_CLOAK_BURNED, myStats->cloak->type, 1);
+							Compendium_t::Events_t::eventUpdate(player, Compendium_t::CPDM_BROKEN, myStats->cloak->type, 1);
 						}
 						if ( player > 0 && multiplayer == SERVER && !players[player]->isLocalPlayer() )
 						{
@@ -4632,7 +4967,7 @@ void Entity::handleEffects(Stat* myStats)
 		myStats->burningInflictedBy = 0;
 	}
 
-	if ( player >= 0 && (stats[player]->type == SKELETON || (stats[player]->playerRace == RACE_SKELETON && stats[player]->appearance == 0)) )
+	if ( player >= 0 && (stats[player]->type == SKELETON || (stats[player]->playerRace == RACE_SKELETON && stats[player]->stat_appearance == 0)) )
 	{
 		// life saving
 		if ( myStats->HP <= 0 )
@@ -4719,8 +5054,8 @@ void Entity::handleEffects(Stat* myStats)
 						net_packet->data[8] = (Sint8)myStats->INT;
 						net_packet->data[9] = (Sint8)myStats->PER;
 						net_packet->data[10] = (Sint8)myStats->CHR;
-						net_packet->data[11] = (Sint8)myStats->EXP;
-						net_packet->data[12] = (Sint8)myStats->LVL;
+						net_packet->data[11] = (Uint8)myStats->EXP;
+						net_packet->data[12] = (Uint8)myStats->LVL;
 						SDLNet_Write16((Sint16)myStats->HP, &net_packet->data[13]);
 						SDLNet_Write16((Sint16)myStats->MAXHP, &net_packet->data[15]);
 						SDLNet_Write16((Sint16)myStats->MP, &net_packet->data[17]);
@@ -4779,7 +5114,7 @@ void Entity::handleEffects(Stat* myStats)
 								int amount = 2 + local_rng.rand() % 2;
 								int oldMP = myStats->MP;
 								this->modMP(amount);
-								if ( player >= 0 && stats[player]->appearance == 0 )
+								if ( player >= 0 && stats[player]->stat_appearance == 0 )
 								{
 									if ( stats[player]->playerRace == RACE_INCUBUS || stats[player]->playerRace == RACE_SUCCUBUS )
 									{
@@ -4847,6 +5182,7 @@ void Entity::handleEffects(Stat* myStats)
 					}
 					myStats->amulet->count = 1;
 					myStats->amulet->status = BROKEN;
+					Compendium_t::Events_t::eventUpdate(player, Compendium_t::CPDM_BROKEN, myStats->amulet->type, 1);
 					playSoundEntity(this, 76, 64);
 					if ( player > 0 && multiplayer == SERVER && !players[player]->isLocalPlayer() )
 					{
@@ -4902,8 +5238,8 @@ void Entity::handleEffects(Stat* myStats)
 							net_packet->data[8] = (Sint8)myStats->INT;
 							net_packet->data[9] = (Sint8)myStats->PER;
 							net_packet->data[10] = (Sint8)myStats->CHR;
-							net_packet->data[11] = (Sint8)myStats->EXP;
-							net_packet->data[12] = (Sint8)myStats->LVL;
+							net_packet->data[11] = (Uint8)myStats->EXP;
+							net_packet->data[12] = (Uint8)myStats->LVL;
 							SDLNet_Write16((Sint16)myStats->HP, &net_packet->data[13]);
 							SDLNet_Write16((Sint16)myStats->MAXHP, &net_packet->data[15]);
 							SDLNet_Write16((Sint16)myStats->MP, &net_packet->data[17]);
@@ -4914,7 +5250,9 @@ void Entity::handleEffects(Stat* myStats)
 							sendPacketSafe(net_sock, -1, net_packet, player - 1);
 						}
 					}
-					this->setHP(std::max(myStats->MAXHP, 10));
+
+					real_t hpRestore = 100 * (0.5 + std::min(2, abs(myStats->amulet->beatitude)) * 0.5);
+					this->setHP(std::max((int)hpRestore, 5));
 					for ( c = 0; c < NUMEFFECTS; c++ )
 					{
 						if ( !(c == EFF_VAMPIRICAURA && myStats->EFFECTS_TIMERS[c] == -2) 
@@ -4955,6 +5293,7 @@ void Entity::handleEffects(Stat* myStats)
 					messagePlayer(player, MESSAGE_STATUS | MESSAGE_OBITUARY, Language::get(657));
 				}
 				myStats->amulet->status = BROKEN;
+				Compendium_t::Events_t::eventUpdate(player, Compendium_t::CPDM_BROKEN, myStats->amulet->type, 1);
 				playSoundEntity(this, 76, 64);
 				if ( player > 0 && multiplayer == SERVER && !players[player]->isLocalPlayer() )
 				{
@@ -4978,30 +5317,33 @@ void Entity::handleEffects(Stat* myStats)
 		{
 			setEffect(EFF_TELEPATH, true, 60, true);
 		}
-		else if ( myStats->mask->type == MASK_PLAGUE && !(myStats->type != HUMAN && effectShapeshift != NOTHING) )
+		else if ( (myStats->mask->type == MASK_PLAGUE) && !(myStats->type != HUMAN && effectShapeshift != NOTHING) )
 		{
 			if ( ticks % 45 == 0 || !myStats->EFFECTS[EFF_NAUSEA_PROTECTION] )
 			{
 				setEffect(EFF_NAUSEA_PROTECTION, true, 60, true);
 			}
-			if ( ticks % 45 == 0 || !myStats->EFFECTS[EFF_POISONED] )
+			if ( myStats->mask->type == MASK_PLAGUE )
 			{
-				if ( !(myStats->type == INSECTOID || (myStats->amulet && myStats->amulet->type == AMULET_POISONRESISTANCE)) )
+				if ( ticks % 45 == 0 || !myStats->EFFECTS[EFF_POISONED] )
 				{
-					bool cursedItemIsBuff = shouldInvertEquipmentBeatitude(myStats);
-					if ( myStats->mask->beatitude >= 0 || cursedItemIsBuff )
+					if ( !(myStats->type == INSECTOID || (myStats->amulet && myStats->amulet->type == AMULET_POISONRESISTANCE)) )
 					{
-						// nothing, good
-					}
-					else
-					{
-						bool poisoned = myStats->EFFECTS[EFF_POISONED];
-						setEffect(EFF_POISONED, true, (TICKS_PER_SECOND + 1) * 3, true);
-						if ( !poisoned && myStats->EFFECTS[EFF_POISONED] )
+						bool cursedItemIsBuff = shouldInvertEquipmentBeatitude(myStats);
+						if ( myStats->mask->beatitude >= 0 || cursedItemIsBuff )
 						{
-							myStats->poisonKiller = 0;
-							messagePlayerColor(player, MESSAGE_STATUS, makeColorRGB(255, 0, 0), 
-								Language::get(6086), myStats->mask->getName());
+							// nothing, good
+						}
+						else
+						{
+							bool poisoned = myStats->EFFECTS[EFF_POISONED];
+							setEffect(EFF_POISONED, true, (TICKS_PER_SECOND + 1) * 3, true);
+							if ( !poisoned && myStats->EFFECTS[EFF_POISONED] )
+							{
+								myStats->poisonKiller = 0;
+								messagePlayerColor(player, MESSAGE_STATUS, makeColorRGB(255, 0, 0), 
+									Language::get(6086), myStats->mask->getName());
+							}
 						}
 					}
 				}
@@ -5103,7 +5445,7 @@ void Entity::handleEffects(Stat* myStats)
 	myStats->OLDHP = myStats->HP;
 }
 
-real_t Entity::getACEffectiveness(Entity* my, Stat* myStats, bool isPlayer, Entity* attacker, Stat* attackerStats)
+real_t Entity::getACEffectiveness(Entity* my, Stat* myStats, bool isPlayer, Entity* attacker, Stat* attackerStats, int& outNumBlessings)
 {
 	if ( !myStats || !my )
 	{
@@ -5154,7 +5496,7 @@ real_t Entity::getACEffectiveness(Entity* my, Stat* myStats, bool isPlayer, Enti
 	{
 		blessings += cursedItemIsBuff ? abs(myStats->amulet->beatitude) : myStats->amulet->beatitude;
 	}
-
+	outNumBlessings = blessings;
 	return std::max(0.0, std::min(1.0, .75 + 0.025 * blessings));
 }
 
@@ -5602,6 +5944,11 @@ Sint32 statGetDEX(Stat* entitystats, Entity* my)
 		//DEX -= 5;
 	}
 
+	if ( entitystats->EFFECTS[EFF_AGILITY] )
+	{
+		DEX += (std::max(5, DEX / 4));
+	}
+
 	if ( my && my->monsterAllyGetPlayerLeader() )
 	{
 		if ( stats[my->monsterAllyIndex] )
@@ -5706,7 +6053,7 @@ Sint32 statGetDEX(Stat* entitystats, Entity* my)
 
 	if ( !(svFlags & SV_FLAG_HUNGER) )
 	{
-		if ( my && my->behavior == &actPlayer && entitystats->playerRace == RACE_INSECTOID && entitystats->appearance == 0 )
+		if ( my && my->behavior == &actPlayer && entitystats->playerRace == RACE_INSECTOID && entitystats->stat_appearance == 0 )
 		{
 			int dexDebuff = 0;
 			if ( entitystats->MP < (entitystats->MAXMP) / 5 )
@@ -5836,6 +6183,14 @@ Sint32 statGetCON(Stat* entitystats, Entity* my)
 	if ( my && entitystats->EFFECTS[EFF_DRUNK] && entitystats->type == GOATMAN )
 	{
 		CON += std::max(4, static_cast<int>(CON * 0.25));
+	}
+	if ( entitystats->EFFECTS[EFF_CON_BONUS] )
+	{
+		CON += 3;
+		int percentHP = static_cast<int>(100.0 * (real_t)entitystats->HP / std::max(1, entitystats->MAXHP));
+		percentHP = std::min(100, std::max(0, percentHP));
+		percentHP = 100 - percentHP;
+		CON += percentHP / 10;
 	}
 	return CON;
 }
@@ -6083,7 +6438,7 @@ Sint32 statGetPER(Stat* entitystats, Entity* my)
 
 	if ( !(svFlags & SV_FLAG_HUNGER) )
 	{
-		if ( my && my->behavior == &actPlayer && entitystats->playerRace == RACE_INSECTOID && entitystats->appearance == 0 )
+		if ( my && my->behavior == &actPlayer && entitystats->playerRace == RACE_INSECTOID && entitystats->stat_appearance == 0 )
 		{
 			int perDebuff = 0;
 			if ( entitystats->MP < (entitystats->MAXMP) / 5 )
@@ -6261,6 +6616,60 @@ bool Entity::isBlind()
 	return false;
 }
 
+bool Entity::isWaterWalking() const
+{
+	if ( behavior == &actMonster )
+	{
+		if ( Stat* stats = getStats() )
+		{
+			if ( stats->shoes && stats->shoes->type == IRON_BOOTS_WATERWALKING )
+			{
+				return true;
+			}
+			if ( stats->type == SLIME )
+			{
+				if ( stats->getAttribute("slime_type") == "terrain_spawn_override" )
+				{
+					return true;
+				}
+				auto color = MonsterData_t::getKeyFromSprite(sprite, SLIME);
+				if ( color == "slime blue"
+					|| color == "slime tar" )
+				{
+					return true;
+				}
+			}
+		}
+	}
+	return false;
+}
+bool Entity::isLavaWalking() const
+{
+	if ( behavior == &actMonster )
+	{
+		if ( Stat* stats = getStats() )
+		{
+			if ( stats->shoes && stats->shoes->type == IRON_BOOTS_WATERWALKING )
+			{
+				return true;
+			}
+			if ( stats->type == SLIME )
+			{
+				if ( stats->getAttribute("slime_type") == "terrain_spawn_override" )
+				{
+					return true;
+				}
+				auto color = MonsterData_t::getKeyFromSprite(sprite, SLIME);
+				if ( color == "slime red" )
+				{
+					return true;
+				}
+			}
+		}
+	}
+	return false;
+}
+
 /*-------------------------------------------------------------------------------
 
 Entity::isInvisible
@@ -6385,6 +6794,11 @@ bool Entity::isMobile()
 
 	if ( isInertMimic() || (entitystats->type == MIMIC 
 		&& (entitystats->EFFECTS[EFF_MIMIC_LOCKED] || monsterSpecialState == MIMIC_MAGIC)) )
+	{
+		return false;
+	}
+
+	if ( entitystats->type == BAT_SMALL && monsterSpecialState == BAT_REST )
 	{
 		return false;
 	}
@@ -6694,6 +7108,10 @@ void Entity::attack(int pose, int charge, Entity* target)
 
 				return; // don't execute the attack, let the monster animation call the attack() function again.
 			}
+			else if ( myStats->type == BUGBEAR && pose == MONSTER_POSE_BUGBEAR_SHIELD )
+			{
+				monsterAttack = pose;
+			}
 			else if ( myStats->type == VAMPIRE && pose == MONSTER_POSE_VAMPIRE_AURA_CAST )
 			{
 				monsterAttack = 0;
@@ -6775,7 +7193,7 @@ void Entity::attack(int pose, int charge, Entity* target)
 			else
 			{
 				serverUpdateEntitySkill(this, 8);
-				if (myStats->type != SLIME && myStats->type != RAT && myStats->type != SCARAB) {
+				if (myStats->type != SLIME && myStats->type != RAT && myStats->type != SCARAB && myStats->type != BAT_SMALL) {
 				    serverUpdateEntitySkill(this, 9);
 				}
 			}
@@ -6829,7 +7247,7 @@ void Entity::attack(int pose, int charge, Entity* target)
 			isIllusion = true;
 		}
 
-		if ( myStats->weapon != nullptr
+		if ( myStats->weapon != nullptr && !(myStats->type == BUGBEAR && pose == MONSTER_POSE_BUGBEAR_SHIELD)
 			&& (!shapeshifted || (shapeshifted && myStats->type == CREATURE_IMP && itemCategory(myStats->weapon) == MAGICSTAFF)) )
 		{
 			// if non-shapeshifted, or you're an imp with a staff then process throwing/magic weapons
@@ -6897,6 +7315,11 @@ void Entity::attack(int pose, int charge, Entity* target)
 							break;
 					}
 
+					if ( behavior == &actPlayer )
+					{
+						Compendium_t::Events_t::eventUpdate(player, Compendium_t::CPDM_MAGICSTAFF_CASTS, myStats->weapon->type, 1);
+					}
+
 					// magicstaffs deplete themselves for each use
 					bool degradeWeapon = true;
 					if ( myStats->type == SHADOW || myStats->type == LICH_FIRE || myStats->type == LICH_ICE )
@@ -6930,12 +7353,20 @@ void Entity::attack(int pose, int charge, Entity* target)
 						if ( myStats->weapon->status != BROKEN )
 						{
 							messagePlayer(player, MESSAGE_EQUIPMENT, Language::get(659));
+							if ( behavior == &actPlayer )
+							{
+								Compendium_t::Events_t::eventUpdate(player, Compendium_t::CPDM_DEGRADED, myStats->weapon->type, 1);
+							}
 						}
 						else
 						{
 							if ( itemCategory(myStats->weapon) == MAGICSTAFF && myStats->weapon->beatitude < 0 )
 							{
 								steamAchievementClient(player, "BARONY_ACH_ONE_MANS_TRASH");
+							}
+							if ( behavior == &actPlayer )
+							{
+								Compendium_t::Events_t::eventUpdate(player, Compendium_t::CPDM_BROKEN, myStats->weapon->type, 1);
 							}
 							messagePlayer(player, MESSAGE_EQUIPMENT, Language::get(660));
 							if ( player >= 0 && players[player]->isLocalPlayer() && client_classes[player] == CLASS_MESMER )
@@ -6948,7 +7379,7 @@ void Entity::attack(int pose, int charge, Entity* target)
 										Item* item = (Item*)spellnode->element;
 										if ( item && itemCategory(item) == SPELL_CAT )
 										{
-											spell_t* spell = getSpellFromItem(player, item);
+											spell_t* spell = getSpellFromItem(player, item, false);
 											if ( spell && spell->ID == SPELL_CHARM_MONSTER )
 											{
 												foundCharmSpell = true;
@@ -7022,8 +7453,21 @@ void Entity::attack(int pose, int charge, Entity* target)
 							castSpell(uid, &spell_lightning, true, false);
 							break;
 						case SPELLBOOK_SLEEP:
-							castSpell(uid, &spell_sleep, true, false);
+						{
+							spell_t* spell = &spell_sleep;
+							if ( Entity* target = uidToEntity(this->monsterTarget) )
+							{
+								if ( Stat* stats = target->getStats() )
+								{
+									if ( target->behavior == &actPlayer && stats->EFFECTS[EFF_ASLEEP] )
+									{
+										spell = &spell_magicmissile;
+									}
+								}
+							}
+							castSpell(uid, spell, true, false);
 							break;
+						}
 						case SPELLBOOK_CONFUSE:
 							castSpell(uid, &spell_confuse, true, false);
 							break;
@@ -7115,6 +7559,12 @@ void Entity::attack(int pose, int charge, Entity* target)
 			// ranged weapons (bows)
 			else if ( isRangedWeapon(*myStats->weapon) )
 			{
+				if ( behavior == &actPlayer )
+				{
+					Compendium_t::Events_t::eventUpdate(skill[2], Compendium_t::CPDM_SHOTS_FIRED,
+						stats[skill[2]]->weapon->type, 1);
+				}
+
 				// damage weapon if applicable
 				int bowDegradeChance = 50;
 				if ( behavior == &actPlayer )
@@ -7206,6 +7656,10 @@ void Entity::attack(int pose, int charge, Entity* target)
 				{
 					entity->z -= 1;
 				}
+				if ( myStats->type == GNOME )
+				{
+					entity->z -= 2;
+				}
 				entity->yaw = yaw;
 				entity->sizex = 1;
 				entity->sizey = 1;
@@ -7228,6 +7682,12 @@ void Entity::attack(int pose, int charge, Entity* target)
 					//TODO: Refactor this so that we don't have to copy paste this check a million times whenever some-one uses up an item.
 					if ( behavior == &actPlayer && pose != MONSTER_POSE_RANGED_SHOOT2 )
 					{
+						if ( players[skill[2]]->isLocalPlayer() )
+						{
+							Compendium_t::Events_t::eventUpdate(skill[2], Compendium_t::CPDM_AMMO_FIRED,
+								myStats->shield->type, 1);
+						}
+
 						myStats->shield->count--;
 						if ( myStats->shield->count <= 0 )
 						{
@@ -7452,6 +7912,12 @@ void Entity::attack(int pose, int charge, Entity* target)
 					}
 				}
 
+				if ( behavior == &actPlayer )
+				{
+					Compendium_t::Events_t::eventUpdate(skill[2], Compendium_t::CPDM_THROWN,
+						stats[skill[2]]->weapon->type, 1);
+				}
+
 				//TODO: Refactor this so that we don't have to copy paste this check a million times whenever some-one uses up an item.
 				myStats->weapon->count--;
 				if ( myStats->weapon->count <= 0 )
@@ -7470,6 +7936,7 @@ void Entity::attack(int pose, int charge, Entity* target)
 			}
 		}
 		bool whip = myStats->weapon && myStats->weapon->type == TOOL_WHIP;
+		bool miss = false;
 		// normal attacks
 		if ( target == nullptr )
 		{
@@ -7482,6 +7949,140 @@ void Entity::attack(int pose, int charge, Entity* target)
 			{
 				playSoundEntity(this, 23 + local_rng.rand() % 5, 128); // whoosh noise
 				dist = lineTrace(this, x, y, yaw, STRIKERANGE, LINETRACE_ATK_CHECK_FRIENDLYFIRE, false);
+			}
+
+			if ( hit.entity && (hit.entity->behavior == &actMonster || hit.entity->behavior == &actPlayer) )
+			{
+				Stat* hitstats = hit.entity->getStats();
+				bool bat = hitstats && hitstats->type == BAT_SMALL;
+				if ( bat && hit.entity->isUntargetableBat() )
+				{
+					miss = true;
+				}
+				else if ( bat && hit.entity->monsterSpecialState == BAT_REST )
+				{
+					miss = false;
+				}
+				else if ( bat || (hitstats && hitstats->EFFECTS[EFF_AGILITY]) )
+				{
+					Sint32 previousMonsterState = hit.entity->monsterState;
+					bool backstab = false;
+					bool flanking = false;
+					real_t hitAngle = hit.entity->yawDifferenceFromEntity(this);
+					if ( (hitAngle >= 0 && hitAngle <= 2 * PI / 3) ) // 120 degree arc
+					{
+						if ( hit.entity->behavior == &actPlayer )
+						{
+							if ( local_rng.rand() % 2 == 0 )
+							{
+								flanking = true;
+							}
+						}
+						else
+						{
+							if ( previousMonsterState == MONSTER_STATE_WAIT
+								|| previousMonsterState == MONSTER_STATE_PATH
+								|| (previousMonsterState == MONSTER_STATE_HUNT && uidToEntity(monsterTarget) == nullptr) )
+							{
+								// unaware monster, get backstab damage.
+								backstab = true;
+							}
+							else if ( local_rng.rand() % 2 == 0 )
+							{
+								// monster currently engaged in some form of combat maneuver
+								// 1 in 2 chance to flank defenses.
+								flanking = true;
+							}
+						}
+					}
+
+					if ( backstab )
+					{
+						miss = false;
+					}
+					else
+					{
+						int baseChance = bat ? 6 : 3;
+						if ( flanking )
+						{
+							baseChance = std::max(1, baseChance - 2);
+						}
+						miss = local_rng.rand() % 10 < baseChance;
+					}
+
+					if ( myStats->weapon )
+					{
+						if ( myStats->weapon->type == ARTIFACT_SPEAR && !shapeshifted )
+						{
+							miss = false;
+						}
+					}
+				}
+
+				if ( miss )
+				{
+					if ( !hit.entity->isUntargetableBat() )
+					{
+						if ( player >= 0 || (behavior == &actMonster && monsterAllyGetPlayerLeader())
+							|| hit.entity->behavior == &actPlayer || hit.entity->monsterAllyGetPlayerLeader() )
+						{
+							spawnDamageGib(hit.entity, 0, DamageGib::DMG_MISS, DamageGibDisplayType::DMG_GIB_MISS, true);
+						}
+						if ( player >= 0 && bat )
+						{
+							steamStatisticUpdateClient(player, STEAM_STAT_PITCH_PERFECT, STEAM_STAT_INT, 1);
+						}
+
+						if ( hit.entity->behavior == &actPlayer )
+						{
+							messagePlayerColor(hit.entity->skill[2], MESSAGE_COMBAT, makeColorRGB(0, 255, 0), Language::get(6286));
+						}
+						else if ( hit.entity->behavior == &actMonster )
+						{
+							bool doHitAlert = true;
+							if ( !(svFlags & SV_FLAG_FRIENDLYFIRE) )
+							{
+								// test for friendly fire
+								if ( checkFriend(hit.entity) )
+								{
+									doHitAlert = false;
+								}
+							}
+
+							if ( doHitAlert )
+							{
+								Stat* hitstats = hit.entity->getStats();
+								if ( hitstats )
+								{
+									bool alertTarget = true;
+									if ( behavior == &actMonster && monsterAllyIndex != -1 && hit.entity->monsterAllyIndex != -1 )
+									{
+										// if we're both allies of players, don't alert the hit target.
+										alertTarget = false;
+									}
+
+									// alert the monster!
+									if ( hit.entity->monsterState != MONSTER_STATE_ATTACK )
+									{
+										if ( alertTarget && hit.entity->monsterSpecialState == 0 )
+										{
+											hit.entity->monsterAcquireAttackTarget(*this, MONSTER_STATE_PATH, true);
+										}
+									}
+
+									// alert other monsters too
+									if ( alertTarget )
+									{
+										hit.entity->alertAlliesOnBeingHit(this);
+									}
+									hit.entity->updateEntityOnHit(this, alertTarget);
+								}
+							}
+						}
+					}
+
+					hit.entity = nullptr;
+				}
 			}
 		}
 		else
@@ -7509,6 +8110,7 @@ void Entity::attack(int pose, int charge, Entity* target)
 			}
 
 			Sint32 previousMonsterState = -1;
+			Sint32 previousMonsterSpecialState = -1;
 
 			if ( hit.entity->behavior == &actBoulder )
 			{
@@ -7621,6 +8223,12 @@ void Entity::attack(int pose, int charge, Entity* target)
 						playSoundEntity(hit.entity, 67, 128);
 						list_RemoveNode(hit.entity->mynode);
 						messagePlayer(player, MESSAGE_COMBAT, Language::get(663));
+
+						if ( myStats->weapon && myStats->weapon->type == TOOL_PICKAXE && !shapeshifted && pose != PLAYER_POSE_GOLEM_SMASH )
+						{
+							Compendium_t::Events_t::eventUpdate(skill[2], Compendium_t::CPDM_PICKAXE_BOULDERS_DUG, myStats->weapon->type, 1);
+						}
+
 						if ( myStats->weapon && local_rng.rand() % 2 && pose != PLAYER_POSE_GOLEM_SMASH )
 						{
 							myStats->weapon->status = static_cast<Status>(myStats->weapon->status - 1);
@@ -7632,10 +8240,22 @@ void Entity::attack(int pose, int charge, Entity* target)
 							{
 								messagePlayer(player, MESSAGE_COMBAT, Language::get(664));
 								playSoundEntity(this, 76, 64);
+
+								if ( behavior == &actPlayer )
+								{
+									if ( myStats->weapon && myStats->weapon->type == TOOL_PICKAXE )
+									{
+										Compendium_t::Events_t::eventUpdate(skill[2], Compendium_t::CPDM_BROKEN, myStats->weapon->type, 1);
+									}
+								}
 							}
 							else
 							{
 								messagePlayer(player, MESSAGE_COMBAT, Language::get(665));
+								if ( behavior == &actPlayer && myStats->weapon )
+								{
+									Compendium_t::Events_t::eventUpdate(player, Compendium_t::CPDM_DEGRADED, myStats->weapon->type, 1);
+								}
 							}
 							if ( player > 0 && multiplayer == SERVER && !players[player]->isLocalPlayer() )
 							{
@@ -7687,6 +8307,7 @@ void Entity::attack(int pose, int charge, Entity* target)
 			else if ( hit.entity->behavior == &actMonster && !mimic )
 			{
 				previousMonsterState = hit.entity->monsterState;
+				previousMonsterSpecialState = hit.entity->monsterSpecialState;
 				hitstats = hit.entity->getStats();
 				if ( hitstats )
 				{
@@ -7789,10 +8410,22 @@ void Entity::attack(int pose, int charge, Entity* target)
 					{
 						messagePlayer(player, MESSAGE_COMBAT, Language::get(664));
 						playSoundEntity(this, 76, 64);
+
+						if ( behavior == &actPlayer )
+						{
+							if ( myStats->weapon && myStats->weapon->type == TOOL_PICKAXE )
+							{
+								Compendium_t::Events_t::eventUpdate(skill[2], Compendium_t::CPDM_BROKEN, myStats->weapon->type, 1);
+							}
+						}
 					}
 					else
 					{
 						messagePlayer(player, MESSAGE_COMBAT, Language::get(665));
+						if ( behavior == &actPlayer && myStats->weapon )
+						{
+							Compendium_t::Events_t::eventUpdate(player, Compendium_t::CPDM_DEGRADED, myStats->weapon->type, 1);
+						}
 					}
 					if ( player > 0 && multiplayer == SERVER && !players[player]->isLocalPlayer() )
 					{
@@ -7823,13 +8456,18 @@ void Entity::attack(int pose, int charge, Entity* target)
 					weaponskill = getWeaponSkill(myStats->weapon);
 					if ( hit.entity->behavior == &actColliderDecoration )
 					{
+						if ( weaponskill >= 0 && hit.entity->isColliderResistToSkill(weaponskill) )
+						{
+							damage = 1;
+						}
+						else
+						{
+							damage = 2 + local_rng.rand() % 3;
+						}
 						if ( weaponskill >= 0 && hit.entity->isColliderWeakToSkill(weaponskill) )
 						{
-							axe = (myStats->getModifiedProficiency(weaponskill) / 20);
-							if ( myStats->getModifiedProficiency(weaponskill) >= SKILL_LEVEL_LEGENDARY )
-							{
-								axe = 9;
-							}
+							axe = 2 * (myStats->getModifiedProficiency(weaponskill) / 20);
+							axe = std::min(axe, 9);
 						}
 					}
 					else if ( weaponskill == PRO_AXE )
@@ -7839,6 +8477,7 @@ void Entity::attack(int pose, int charge, Entity* target)
 						{
 							axe = 9;
 						}
+						axe = std::min(axe, 9);
 					}
 				}
 				else
@@ -7846,13 +8485,18 @@ void Entity::attack(int pose, int charge, Entity* target)
 					weaponskill = PRO_UNARMED;
 					if ( hit.entity->behavior == &actColliderDecoration )
 					{
+						if ( hit.entity->isColliderResistToSkill(weaponskill) )
+						{
+							damage = 1;
+						}
+						else
+						{
+							damage = 2 + local_rng.rand() % 3;
+						}
 						if ( hit.entity->isColliderWeakToSkill(weaponskill) )
 						{
-							axe = (myStats->getModifiedProficiency(weaponskill) / 20);
-							if ( myStats->getModifiedProficiency(weaponskill) >= SKILL_LEVEL_LEGENDARY )
-							{
-								axe = 9;
-							}
+							axe = 2 * (myStats->getModifiedProficiency(weaponskill) / 20);
+							axe = std::min(axe, 9);
 						}
 					}
 					else if ( hit.entity->behavior != &::actChest && !mimic )
@@ -7862,6 +8506,7 @@ void Entity::attack(int pose, int charge, Entity* target)
 						{
 							axe = 9;
 						}
+						axe = std::min(axe, 9);
 					}
 				}
 				if ( pose == PLAYER_POSE_GOLEM_SMASH )
@@ -7981,10 +8626,12 @@ void Entity::attack(int pose, int charge, Entity* target)
 						{
 							hit.entity->skill[6] = (y < hit.entity->y);
 						}
+						Compendium_t::Events_t::eventUpdateWorld(player, Compendium_t::CPDM_DOOR_BROKEN, "door", 1);
 					}
 					else if ( hit.entity->behavior == &::actChest )
 					{
 						messagePlayer(player, MESSAGE_COMBAT, Language::get(671));
+						Compendium_t::Events_t::eventUpdateWorld(player, Compendium_t::CPDM_CHESTS_DESTROYED, "chest", 1);
 					}
 					else if ( mimic )
 					{
@@ -7992,8 +8639,20 @@ void Entity::attack(int pose, int charge, Entity* target)
 					}
 					else if ( hit.entity->isDamageableCollider() )
 					{
+						hit.entity->colliderKillerUid = getUID();
 						messagePlayer(player, MESSAGE_COMBAT, Language::get(hit.entity->getColliderOnBreakLangEntry()),
 							Language::get(hit.entity->getColliderLangName()));
+						if ( hit.entity->isColliderWall() )
+						{
+							Compendium_t::Events_t::eventUpdateWorld(player, Compendium_t::CPDM_BARRIER_DESTROYED, "breakable barriers", 1);
+						}
+						if ( behavior == &actPlayer )
+						{
+							if ( hit.entity->isColliderBreakableContainer() )
+							{
+								steamStatisticUpdateClient(player, STEAM_STAT_SMASH_MELEE, STEAM_STAT_INT, 1);
+							}
+						}
 					}
 					else if ( hit.entity->behavior == &::actFurniture )
 					{
@@ -8095,19 +8754,23 @@ void Entity::attack(int pose, int charge, Entity* target)
 				{
 					hit.entity->skill[0]--; //Deplete one usage.
 
-											//50% chance spawn a slime.
+					//50% chance spawn a slime.
 					if ( local_rng.rand() % 2 == 0 )
 					{
 						// spawn slime
-						Entity* monster = summonMonster(SLIME, x, y);
+						int ox = hit.entity->x / 16;
+						int oy = hit.entity->y / 16;
+						Entity* monster = summonMonster(SLIME, ox * 16 + 8, oy * 16 + 8);
 						if ( monster )
 						{
 							auto& rng = hit.entity->entity_rng ? *hit.entity->entity_rng : local_rng;
 							monster->seedEntityRNG(rng.getU32());
-
+							slimeSetType(monster, monster->getStats(), true, &rng);
 							messagePlayer(player, MESSAGE_HINT, Language::get(582));
-							Stat* monsterStats = monster->getStats();
-							monsterStats->LVL = 4;
+							if ( behavior == &actPlayer )
+							{
+								Compendium_t::Events_t::eventUpdateWorld(skill[2], Compendium_t::CPDM_SINKS_SLIMES, "sink", 1);
+							}
 						}
 					}
 
@@ -8183,6 +8846,10 @@ void Entity::attack(int pose, int charge, Entity* target)
 				//	weaponskill = -1;
 				//}
 				if ( shapeshifted || pose == PLAYER_POSE_GOLEM_SMASH )
+				{
+					weaponskill = PRO_UNARMED;
+				}
+				if ( pose == MONSTER_POSE_BUGBEAR_SHIELD )
 				{
 					weaponskill = PRO_UNARMED;
 				}
@@ -8279,6 +8946,10 @@ void Entity::attack(int pose, int charge, Entity* target)
 					}
 
 					int myAttack = std::max(0, (Entity::getAttack(this, myStats, behavior == &actPlayer) * damagePreMultiplier) + getBonusAttackOnTarget(*hitstats));
+					if ( myStats->type == BUGBEAR && pose == MONSTER_POSE_BUGBEAR_SHIELD )
+					{
+						myAttack += 2 + local_rng.rand() % 3;
+					}
 					int enemyAC = AC(hitstats);
 					if ( weaponskill == PRO_POLEARM && myStats->weapon && myStats->weapon->type == ARTIFACT_SPEAR && !shapeshifted )
 					{
@@ -8290,7 +8961,8 @@ void Entity::attack(int pose, int charge, Entity* target)
 							gugnirProc = true;
 						}
 					}
-					real_t targetACEffectiveness = Entity::getACEffectiveness(hit.entity, hitstats, hit.entity->behavior == &actPlayer, this, myStats);
+					int numBlessings = 0;
+					real_t targetACEffectiveness = Entity::getACEffectiveness(hit.entity, hitstats, hit.entity->behavior == &actPlayer, this, myStats, numBlessings);
 					int attackAfterReductions = static_cast<int>(std::max(0.0, ((myAttack * targetACEffectiveness - enemyAC))) + (1.0 - targetACEffectiveness) * myAttack);
 					if ( weaponskill == PRO_UNARMED )
 					{
@@ -8309,11 +8981,22 @@ void Entity::attack(int pose, int charge, Entity* target)
 						damage = attackAfterReductions;
 					}
 
-					damage = std::max(0, damage);
+					if ( targetACEffectiveness < 0.99 )
+					{
+						damage = std::max(1, damage);
+					}
+					else
+					{
+						damage = std::max(0, damage);
+					}
 
 					if ( weaponskill == PRO_AXE )
 					{
 						damage++;
+						if ( myStats->type == BUGBEAR )
+						{
+							damage += 1;
+						}
 					}
 					if ( myStats->type == LICH_FIRE && !hitstats->defending )
 					{
@@ -8359,9 +9042,22 @@ void Entity::attack(int pose, int charge, Entity* target)
 									}
 								}
 								damage += bonus;
-								if ( local_rng.rand() % 4 > 0 && hit.entity->behavior != &actPlayer )
+								if ( hit.entity->behavior != &actPlayer )
 								{
-									this->increaseSkill(PRO_STEALTH);
+									if ( hitstats->type == BAT_SMALL && previousMonsterSpecialState == BAT_REST )
+									{
+										if ( local_rng.rand() % 10 == 0 )
+										{
+											this->increaseSkill(PRO_STEALTH);
+										}
+									}
+									else
+									{
+										if ( local_rng.rand() % 4 > 0 )
+										{
+											this->increaseSkill(PRO_STEALTH);
+										}
+									}
 								}
 							}
 							else if ( local_rng.rand() % 2 == 0 )
@@ -8375,15 +9071,6 @@ void Entity::attack(int pose, int charge, Entity* target)
 									this->increaseSkill(PRO_STEALTH);
 								}
 							}
-						}
-					}
-
-					bool gungnir = false;
-					if ( myStats->weapon )
-					{
-						if ( myStats->weapon->type == ARTIFACT_SPEAR )
-						{
-							gungnir = true;
 						}
 					}
 
@@ -8409,7 +9096,7 @@ void Entity::attack(int pose, int charge, Entity* target)
 						}*/
 						real_t variance = 20;
 						real_t baseSkillModifier = 50.0; // 40-60 base
-						Entity::setMeleeDamageSkillModifiers(this, myStats, weaponskill, baseSkillModifier, variance);
+						Entity::setMeleeDamageSkillModifiers(this, myStats, weaponskill, baseSkillModifier, variance, nullptr);
 						real_t skillModifier = baseSkillModifier - (variance / 2) + (myStats->getModifiedProficiency(weaponskill) / 2.0);
 						skillModifier += (local_rng.rand() % (1 + static_cast<int>(variance)));
 						skillModifier /= 100.0;
@@ -8431,7 +9118,8 @@ void Entity::attack(int pose, int charge, Entity* target)
 
 
 					int olddamage = damage;
-					damage *= std::max(charge, MAXCHARGE / 2) / ((double)(MAXCHARGE / 2));
+					const int chargeMult = std::max(charge, MAXCHARGE / 2) / ((double)(MAXCHARGE / 2));
+					damage *= chargeMult;
 					bool parashuProc = false;
 					if ( myStats->weapon && !shapeshifted )
 					{
@@ -8467,7 +9155,58 @@ void Entity::attack(int pose, int charge, Entity* target)
 						}
 					}
 
+					if ( playerhit >= 0 )
+					{
+						if ( hitstats->defending && damage == 0 && hitstats->shield )
+						{
+							Compendium_t::Events_t::eventUpdate(playerhit, Compendium_t::CPDM_BLOCKED_ATTACKS, hitstats->shield->type, 1);
+							Compendium_t::Events_t::eventUpdate(playerhit, Compendium_t::CPDM_BLOCKED_HIGHEST_DMG, hitstats->shield->type, myAttack);
+						}
+
+						if ( hitstats->shield && hitstats->defending )
+						{
+							Compendium_t::Events_t::eventUpdateCodex(playerhit, Compendium_t::CPDM_CLASS_BLOCK_DEFENDED, "blocking", 1);
+							Compendium_t::Events_t::eventUpdateCodex(playerhit, Compendium_t::CPDM_CLASS_BLOCK_DEFENDED_RUN, "blocking", 1);
+						}
+						else
+						{
+							Compendium_t::Events_t::eventUpdateCodex(playerhit, Compendium_t::CPDM_CLASS_BLOCK_UNDEFENDED, "blocking", 1);
+							Compendium_t::Events_t::eventUpdateCodex(playerhit, Compendium_t::CPDM_CLASS_BLOCK_UNDEFENDED_RUN, "blocking", 1);
+						}
+					}
+
+					Item** weaponToBreak = nullptr;
+					ItemType weaponType = static_cast<ItemType>(WOODEN_SHIELD);
+					bool hasMeleeGloves = false;
+					if ( myStats->gloves && !shapeshifted )
+					{
+						switch ( myStats->gloves->type )
+						{
+						case BRASS_KNUCKLES:
+						case IRON_KNUCKLES:
+						case SPIKED_GAUNTLETS:
+							hasMeleeGloves = true;
+							break;
+						default:
+							break;
+						}
+					}
+					if ( myStats->weapon && !shapeshifted )
+					{
+						weaponToBreak = &myStats->weapon;
+					}
+					else if ( hasMeleeGloves )
+					{
+						weaponToBreak = &myStats->gloves;
+					}
+					if ( weaponToBreak != nullptr && !shapeshifted )
+					{
+						weaponType = (*weaponToBreak)->type;
+					}
+
+					Sint32 oldHP = hitstats->HP;
 					hit.entity->modHP(-damage); // do the damage
+
 					bool skillIncreased = false;
 					// skill increase
 					// can raise skills up to skill level 20 on dummybots...
@@ -8596,36 +9335,23 @@ void Entity::attack(int pose, int charge, Entity* target)
 					bool isWeakWeapon = false;
 					bool artifactWeapon = false;
 					bool degradeWeapon = false;
-					ItemType weaponType = static_cast<ItemType>(WOODEN_SHIELD);
-					bool hasMeleeGloves = false;
-					if ( myStats->gloves && !shapeshifted )
+
+					if ( weaponToBreak != nullptr && weaponType != WOODEN_SHIELD )
 					{
-						switch ( myStats->gloves->type )
+						if ( behavior == &actPlayer )
 						{
-							case BRASS_KNUCKLES:
-							case IRON_KNUCKLES:
-							case SPIKED_GAUNTLETS:
-								hasMeleeGloves = true;
-								break;
-							default:
-								break;
+							Compendium_t::Events_t::eventUpdate(skill[2], Compendium_t::CPDM_ATTACKS,
+								weaponType, 1);
+							if ( pose == PLAYER_POSE_GOLEM_SMASH )
+							{
+								Compendium_t::Events_t::eventUpdate(skill[2], Compendium_t::CPDM_SPELL_DMG, SPELL_ITEM, damage, false, SPELL_STRIKE);
+							}
+							else
+							{
+								Compendium_t::Events_t::eventUpdate(skill[2], Compendium_t::CPDM_DMG_MAX, weaponType, damage);
+							}
 						}
-					}
 
-					Item** weaponToBreak = nullptr;
-					
-					if ( myStats->weapon )
-					{
-						weaponToBreak = &myStats->weapon;
-					}
-					else if ( hasMeleeGloves )
-					{
-						weaponToBreak = &myStats->gloves;
-					}
-
-					if ( weaponToBreak != nullptr && !shapeshifted )
-					{
-						weaponType = (*weaponToBreak)->type;
 						if ( weaponType == ARTIFACT_AXE || weaponType == ARTIFACT_MACE || weaponType == ARTIFACT_SPEAR || weaponType == ARTIFACT_SWORD )
 						{
 							artifactWeapon = true;
@@ -8722,11 +9448,19 @@ void Entity::attack(int pose, int charge, Entity* target)
 								if ( (*weaponToBreak)->status != BROKEN )
 								{
 									messagePlayer(player, MESSAGE_EQUIPMENT, Language::get(679));
+									if ( behavior == &actPlayer )
+									{
+										Compendium_t::Events_t::eventUpdate(player, Compendium_t::CPDM_DEGRADED, (*weaponToBreak)->type, 1);
+									}
 								}
 								else
 								{
 									playSoundEntity(this, 76, 64);
 									messagePlayer(player, MESSAGE_EQUIPMENT, Language::get(680));
+									if ( behavior == &actPlayer )
+									{
+										Compendium_t::Events_t::eventUpdate(player, Compendium_t::CPDM_BROKEN, (*weaponToBreak)->type, 1);
+									}
 								}
 								if ( player > 0 && multiplayer == SERVER && !players[player]->isLocalPlayer() )
 								{
@@ -8757,7 +9491,7 @@ void Entity::attack(int pose, int charge, Entity* target)
 					Item* armor = NULL;
 					int armornum = 0;
 					bool isWeakArmor = false;
-
+					bool shieldIncreased = false;
 					if ( damage > 0 || (damage == 0 && !(hitstats->shield && hitstats->defending)) )
 					{
 						// choose random piece of equipment to target
@@ -8801,16 +9535,27 @@ void Entity::attack(int pose, int charge, Entity* target)
 							armorDegradeChance += 10;
 						}
 
-						if ( hit.entity->behavior == &actPlayer && armornum == 4 )
+						if ( hit.entity->behavior == &actPlayer && armornum == 4 && hitstats->shield )
 						{
-							armorDegradeChance += (hitstats->getModifiedProficiency(PRO_SHIELD) / 10);
-							if ( itemCategory(hitstats->shield) == ARMOR )
-							{
-								armorDegradeChance += (hitstats->getModifiedProficiency(PRO_SHIELD) / 10); // 2x shield bonus offhand
-							}
 							if ( skillCapstoneUnlocked(hit.entity->skill[2], PRO_SHIELD) )
 							{
 								armorDegradeChance = 100; // don't break.
+							}
+							else
+							{
+								if ( itemCategory(hitstats->shield) == ARMOR )
+								{
+									armorDegradeChance += 2 * (hitstats->getModifiedProficiency(PRO_SHIELD) / 10);
+									armorDegradeChance += 10;
+									if ( !players[hit.entity->skill[2]]->mechanics.itemDegradeRoll(hitstats->shield) )
+									{
+										armorDegradeChance = 100; // don't break.
+									}
+								}
+								else
+								{
+									armorDegradeChance += (hitstats->getModifiedProficiency(PRO_SHIELD) / 10);
+								}
 							}
 						}
 
@@ -8870,29 +9615,69 @@ void Entity::attack(int pose, int charge, Entity* target)
 							if ( itemCategory(hitstats->shield) == ARMOR
 								|| (hitstats->defending) )
 							{
-								if ( (local_rng.rand() % 15 == 0 && damage > 0) || (damage == 0 && local_rng.rand() % 8 == 0) )
+								int roll = 20;
+								int hitskill = hitstats->getProficiency(PRO_SHIELD) / 20;
+								roll += hitskill * 5;
+								if ( damage == 0 )
 								{
-									bool increaseSkill = true;
-									if ( hit.entity->behavior == &actPlayer && behavior == &actPlayer )
+									roll /= 2;
+								}
+								if ( myStats->type == BAT_SMALL )
+								{
+									if ( hitstats->getProficiency(PRO_SHIELD) >= SKILL_LEVEL_BASIC )
 									{
-										increaseSkill = false;
+										roll *= 4;
 									}
-									else if ( hit.entity->behavior == &actPlayer && this->monsterAllyGetPlayerLeader() )
+								}
+								if ( roll > 0 )
+								{
+									bool success = (local_rng.rand() % roll == 0);
+									if ( !success && playerhit >= 0 && hitstats->defending )
 									{
-										increaseSkill = false;
+  										if ( players[playerhit]->mechanics.defendTicks != 0 )
+										{
+											if ( (::ticks - players[playerhit]->mechanics.defendTicks) < (TICKS_PER_SECOND / 3) )
+											{
+												// perfect block timing, roll again
+												success = (local_rng.rand() % roll == 0);
+											}
+										}
 									}
-									else if ( hitstats->EFFECTS[EFF_SHAPESHIFT] )
+
+									if ( success )
 									{
-										increaseSkill = false;
-									}
-									else if ( itemCategory(hitstats->shield) != ARMOR
-										&& hitstats->getProficiency(PRO_SHIELD) >= SKILL_LEVEL_SKILLED )
-									{
-										increaseSkill = false; // non-shield offhands dont increase skill past 40.
-									}
-									if ( increaseSkill )
-									{
-										hit.entity->increaseSkill(PRO_SHIELD); // increase shield skill
+										bool increaseSkill = true;
+										if ( hit.entity->behavior == &actPlayer && behavior == &actPlayer )
+										{
+											increaseSkill = false;
+										}
+										else if ( hit.entity->behavior == &actPlayer && this->monsterAllyGetPlayerLeader() )
+										{
+											increaseSkill = false;
+										}
+										else if ( hit.entity->behavior == &actPlayer
+											&& !players[hit.entity->skill[2]]->mechanics.allowedRaiseBlockingAgainstEntity(*this) )
+										{
+											increaseSkill = false;
+										}
+										else if ( hitstats->EFFECTS[EFF_SHAPESHIFT] )
+										{
+											increaseSkill = false;
+										}
+										else if ( itemCategory(hitstats->shield) != ARMOR
+											&& hitstats->getProficiency(PRO_SHIELD) >= SKILL_LEVEL_SKILLED )
+										{
+											increaseSkill = false; // non-shield offhands dont increase skill past 40.
+										}
+										if ( increaseSkill )
+										{
+											hit.entity->increaseSkill(PRO_SHIELD); // increase shield skill
+											shieldIncreased = true;
+											if ( hit.entity->behavior == &actPlayer )
+											{
+												players[hit.entity->skill[2]]->mechanics.enemyRaisedBlockingAgainst[this->getUID()]++;
+											}
+										}
 									}
 								}
 							}
@@ -8909,12 +9694,23 @@ void Entity::attack(int pose, int charge, Entity* target)
 							{
 								shieldDegradeChance += 10;
 							}
+							if ( weaponskill == PRO_MACE )
+							{
+								shieldDegradeChance *= 0.75;
+							}
 							if ( hit.entity->behavior == &actPlayer )
 							{
-								shieldDegradeChance += (hitstats->getModifiedProficiency(PRO_SHIELD) / 10);
 								if ( itemCategory(hitstats->shield) == ARMOR )
 								{
-									shieldDegradeChance += (hitstats->getModifiedProficiency(PRO_SHIELD) / 10); // 2x shield bonus offhand
+									shieldDegradeChance += 2 * (hitstats->getModifiedProficiency(PRO_SHIELD) / 10); // 2x shield bonus offhand
+									if ( !players[hit.entity->skill[2]]->mechanics.itemDegradeRoll(hitstats->shield) )
+									{
+										shieldDegradeChance = 100; // don't break.
+									}
+								}
+								else
+								{
+									shieldDegradeChance += (hitstats->getModifiedProficiency(PRO_SHIELD) / 10);
 								}
 								if ( skillCapstoneUnlocked(hit.entity->skill[2], PRO_SHIELD) )
 								{
@@ -8941,6 +9737,11 @@ void Entity::attack(int pose, int charge, Entity* target)
 							if ( player >= 0 && hit.entity->behavior == &actMonster )
 							{
 								steamStatisticUpdateClient(player, STEAM_STAT_UNSTOPPABLE_FORCE, STEAM_STAT_INT, 1);
+								if ( armornum == 4 && hitstats->type == BUGBEAR 
+									&& (hitstats->defending || hit.entity->monsterAttack == MONSTER_POSE_BUGBEAR_SHIELD) )
+								{
+									steamAchievementClient(player, "BARONY_ACH_BEAR_WITH_ME");
+								}
 							}
 						}
 					}
@@ -9096,6 +9897,7 @@ void Entity::attack(int pose, int charge, Entity* target)
 								if ( behavior == &actPlayer ) // redundant; but if this code ever changes...
 								{
 									steamAchievementClient(skill[2], "BARONY_ACH_ONE_PUNCH_MAN");
+									Compendium_t::Events_t::eventUpdateCodex(skill[2], Compendium_t::CPDM_SKILL_LEGENDARY_PROCS, "unarmed skill", 1);
 								}
 							}
 							hit.entity->modHP(-5); // do extra damage.
@@ -9225,6 +10027,10 @@ void Entity::attack(int pose, int charge, Entity* target)
 										}
 									}
 									knockbackInflicted = true;
+									if ( behavior == &actPlayer )
+									{
+										Compendium_t::Events_t::eventUpdateCodex(skill[2], Compendium_t::CPDM_SKILL_LEGENDARY_PROCS, "polearm skill", 1);
+									}
 								}
 								hit.entity->modHP(-capstoneDamage); // do the damage
 							}
@@ -9242,6 +10048,10 @@ void Entity::attack(int pose, int charge, Entity* target)
 										paralyzeStatusInflicted = true;
 										playSoundEntity(hit.entity, 172, 64); //TODO: Paralyze spell sound.
 										spawnMagicEffectParticles(hit.entity->x, hit.entity->y, hit.entity->z, 170);
+										if ( behavior == &actPlayer )
+										{
+											Compendium_t::Events_t::eventUpdateCodex(skill[2], Compendium_t::CPDM_SKILL_LEGENDARY_PROCS, "mace skill", 1);
+										}
 									}
 								}
 								hit.entity->modHP(-capstoneDamage); // do the damage
@@ -9258,6 +10068,10 @@ void Entity::attack(int pose, int charge, Entity* target)
 									slowStatusInflicted = true;
 									playSoundEntity(hit.entity, 396 + local_rng.rand() % 3, 64);
 									spawnMagicEffectParticles(hit.entity->x, hit.entity->y, hit.entity->z, 171);
+									if ( behavior == &actPlayer )
+									{
+										Compendium_t::Events_t::eventUpdateCodex(skill[2], Compendium_t::CPDM_SKILL_LEGENDARY_PROCS, "axe skill", 1);
+									}
 								}
 								hit.entity->modHP(-capstoneDamage); // do the damage
 								// don't re-notify if already inflicted slow from Parashu.
@@ -9279,6 +10093,10 @@ void Entity::attack(int pose, int charge, Entity* target)
 										serverSpawnGibForClient(gib);
 									}
 									hit.entity->modHP(-capstoneDamage); // do the damage
+									if ( behavior == &actPlayer )
+									{
+										Compendium_t::Events_t::eventUpdateCodex(skill[2], Compendium_t::CPDM_SKILL_LEGENDARY_PROCS, "sword skill", 1);
+									}
 								}
 								else
 								{
@@ -9313,6 +10131,54 @@ void Entity::attack(int pose, int charge, Entity* target)
 							{
 								// only play sound once on primary target.
 								playSoundEntity(hit.entity, 181, 64);
+							}
+						}
+					}
+					else if ( myStats->type == BUGBEAR && pose == MONSTER_POSE_BUGBEAR_SHIELD )
+					{
+						if ( hit.entity->setEffect(EFF_KNOCKBACK, true, 30, false) )
+						{
+							real_t pushbackMultiplier = 0.9;
+							knockbackInflicted = true;
+
+							real_t tangent = atan2(hit.entity->y - this->y, hit.entity->x - this->x);
+							if ( hit.entity->behavior == &actMonster )
+							{
+								hit.entity->vel_x = cos(tangent) * pushbackMultiplier;
+								hit.entity->vel_y = sin(tangent) * pushbackMultiplier;
+								hit.entity->monsterKnockbackVelocity = 0.01;
+								hit.entity->monsterKnockbackUID = this->getUID();
+								hit.entity->monsterKnockbackTangentDir = tangent;
+								//hit.entity->lookAtEntity(*parent);
+							}
+							else if ( hit.entity->behavior == &actPlayer )
+							{
+								if ( !players[hit.entity->skill[2]]->isLocalPlayer() )
+								{
+									hit.entity->monsterKnockbackVelocity = pushbackMultiplier;
+									hit.entity->monsterKnockbackTangentDir = tangent;
+									serverUpdateEntityFSkill(hit.entity, 11);
+									serverUpdateEntityFSkill(hit.entity, 9);
+								}
+								else
+								{
+									hit.entity->monsterKnockbackVelocity = pushbackMultiplier;
+									hit.entity->monsterKnockbackTangentDir = tangent;
+								}
+							}
+						}
+					}
+					else if ( myStats->type == BAT_SMALL )
+					{
+						if ( !hitstats->EFFECTS[EFF_BLEEDING] )
+						{
+							if ( !hitstats->defending )
+							{
+								if ( hit.entity->setEffect(EFF_BLEEDING, true, 6 * TICKS_PER_SECOND, false) )
+								{
+									statusInflicted = true;
+									messagePlayer(playerhit, MESSAGE_COMBAT, Language::get(701));
+								}
 							}
 						}
 					}
@@ -9579,23 +10445,46 @@ void Entity::attack(int pose, int charge, Entity* target)
 
 					if ( player >= 0 && hit.entity->behavior == &actMonster )
 					{
-						if ( damage > 0 )
+						bool oldRhythmStatus = achievementStatusRhythmOfTheKnight[player];
+						updateAchievementRhythmOfTheKnight(player, hit.entity, false);
+						if ( !oldRhythmStatus && achievementStatusRhythmOfTheKnight[player] )
 						{
-							updateAchievementRhythmOfTheKnight(player, hit.entity, false);
-						}
-						else
-						{
-							if ( !achievementStatusRhythmOfTheKnight[player] )
+							//messagePlayer(0, MESSAGE_DEBUG, "rhythm roll on atk");
+							if ( local_rng.rand() % 10 < 8 )
 							{
-								achievementRhythmOfTheKnightVec[player].clear(); // didn't inflict damage.
+								bool increaseSkill = true;
+								if ( this->behavior == &actPlayer )
+								{
+									if ( !players[this->skill[2]]->mechanics.allowedRaiseBlockingAgainstEntity(*hit.entity) )
+									{
+										increaseSkill = false;
+									}
+									if ( myStats->shield && itemCategory(myStats->shield) != ARMOR )
+									{
+										if ( myStats->getProficiency(PRO_SHIELD) >= SKILL_LEVEL_SKILLED )
+										{
+											increaseSkill = false;
+										}
+									}
+									if ( increaseSkill )
+									{
+										players[this->skill[2]]->mechanics.enemyRaisedBlockingAgainst[hit.entity->getUID()]++;
+									}
+								}
+								if ( increaseSkill )
+								{
+									this->increaseSkill(PRO_SHIELD);
+								}
 							}
+							achievementStatusRhythmOfTheKnight[player] = false;
+							achievementRhythmOfTheKnightVec[player].clear(); // reset for the next one
 						}
 					}
 
 					bool artifactWeaponProc = parashuProc || dyrnwynSmite || dyrnwynBurn || gugnirProc;
 
 					// send messages
-					if ( !strcmp(hitstats->name, "") )
+					if ( !strcmp(hitstats->name, "") || monsterNameIsGeneric(*hitstats) )
 					{
 						Uint32 color = makeColorRGB(0, 255, 0);
 						Uint32 colorSpecial = color;// makeColorRGB(255, 0, 255);
@@ -9745,6 +10634,21 @@ void Entity::attack(int pose, int charge, Entity* target)
 								}
 							}
 							awardXP(hit.entity, true, true);
+
+							if ( player >= 0 )
+							{
+								Compendium_t::Events_t::eventUpdateCodex(player, Compendium_t::CPDM_MELEE_KILLS, "melee", 1);
+								if ( chargeMult > 1 )
+								{
+									Compendium_t::Events_t::eventUpdateCodex(player, Compendium_t::CPDM_CRIT_KILLS, "crits", 1);
+								}
+								if ( backstab )
+								{
+									Compendium_t::Events_t::eventUpdateCodex(player, Compendium_t::CPDM_BACKSTAB_KILLS, "backstabs", 1);
+									Compendium_t::Events_t::eventUpdateCodex(player, Compendium_t::CPDM_CLASS_BACKSTAB_KILLS_RUN, "backstabs", 1);
+								}
+							}
+
 							if ( player >= 0 && myStats->weapon && this->checkEnemy(hit.entity) )
 							{
 								if ( myStats->weapon->ownerUid == hit.entity->getUID() )
@@ -9923,6 +10827,16 @@ void Entity::attack(int pose, int charge, Entity* target)
 								}
 							}
 							awardXP(hit.entity, true, true);
+
+							if ( player >= 0 )
+							{
+								Compendium_t::Events_t::eventUpdateCodex(player, Compendium_t::CPDM_MELEE_KILLS, "melee", 1);
+								if ( chargeMult > 1 )
+								{
+									Compendium_t::Events_t::eventUpdateCodex(player, Compendium_t::CPDM_CRIT_KILLS, "crits", 1);
+								}
+							}
+
 							if ( player >= 0 && myStats->weapon && this->checkEnemy(hit.entity) )
 							{
 								if ( myStats->weapon->ownerUid == hit.entity->getUID() )
@@ -10113,8 +11027,16 @@ void Entity::attack(int pose, int charge, Entity* target)
 						else
 						{
 							strcpy((char*)net_packet->data, "SHAK");
-							net_packet->data[4] = 10; // turns into .1
-							net_packet->data[5] = 10;
+							if ( damage > 0 )
+							{
+								net_packet->data[4] = 10; // turns into .1
+								net_packet->data[5] = 10;
+							}
+							else
+							{
+								net_packet->data[4] = 5; // turns into .05
+								net_packet->data[5] = 5;
+							}
 							net_packet->address.host = net_clients[playerhit - 1].host;
 							net_packet->address.port = net_clients[playerhit - 1].port;
 							net_packet->len = 6;
@@ -10158,14 +11080,6 @@ void Entity::attack(int pose, int charge, Entity* target)
 						messagePlayerMonsterEvent(playerhit, color, *myStats, Language::get(698), Language::get(699), MSG_ATTACKS);
 						if ( playerhit >= 0 )
 						{
-							if ( !achievementStatusRhythmOfTheKnight[playerhit] )
-							{
-								achievementRhythmOfTheKnightVec[playerhit].clear();
-							}
-							if ( !achievementStatusThankTheTank[playerhit] )
-							{
-								achievementThankTheTankPair[playerhit] = std::make_pair(0, 0);
-							}
 							if ( behavior == &actMonster )
 							{
 								updateAchievementBaitAndSwitch(playerhit, false);
@@ -10204,17 +11118,94 @@ void Entity::attack(int pose, int charge, Entity* target)
 						{
 							steamAchievementClient(playerhit, "BARONY_ACH_ONE_WHO_KNOCKS");
 						}
-						if ( playerhit >= 0 )
+					}
+
+					if ( playerhit >= 0 )
+					{
+						if ( hitstats->defending )
 						{
-							if ( hitstats->defending )
+							bool oldRhythmStatus = achievementStatusRhythmOfTheKnight[playerhit];
+							updateAchievementRhythmOfTheKnight(playerhit, this, true);
+							if ( !oldRhythmStatus && achievementStatusRhythmOfTheKnight[playerhit] )
 							{
-								updateAchievementRhythmOfTheKnight(playerhit, this, true);
-								updateAchievementThankTheTank(playerhit, this, false);
+								if ( !shieldIncreased )
+								{
+									//messagePlayer(0, MESSAGE_DEBUG, "rhythm roll on hit");
+									if ( local_rng.rand() % 10 < 8 )
+									{
+										bool skillIncrease = true;
+										if ( hit.entity->behavior == &actPlayer )
+										{
+											if ( !players[hit.entity->skill[2]]->mechanics.allowedRaiseBlockingAgainstEntity(*this) )
+											{
+												skillIncrease = false;
+											}
+											if ( hitstats->shield && itemCategory(hitstats->shield) != ARMOR )
+											{
+												if ( hitstats->getProficiency(PRO_SHIELD) >= SKILL_LEVEL_SKILLED )
+												{
+													skillIncrease = false;
+												}
+											}
+											if ( skillIncrease )
+											{
+												players[hit.entity->skill[2]]->mechanics.enemyRaisedBlockingAgainst[this->getUID()]++;
+											}
+										}
+										if ( skillIncrease )
+										{
+											hit.entity->increaseSkill(PRO_SHIELD);
+											shieldIncreased = true;
+										}
+									}
+								}
+								achievementStatusRhythmOfTheKnight[playerhit] = false;
+								achievementRhythmOfTheKnightVec[playerhit].clear(); // reset for the next one
 							}
-							else if ( !achievementStatusRhythmOfTheKnight[playerhit] )
+							updateAchievementThankTheTank(playerhit, this, false);
+						}
+						else
+						{
+							achievementStatusRhythmOfTheKnight[playerhit] = false;
+							achievementRhythmOfTheKnightVec[playerhit].clear();
+							achievementThankTheTankPair[playerhit].erase(this->getUID());
+							//messagePlayer(0, "used AC!");
+						}
+					}
+
+					if ( playerhit >= 0 )
+					{
+						Compendium_t::Events_t::eventUpdateCodex(playerhit, Compendium_t::CPDM_HP_MOST_DMG_LOST_ONE_HIT, "hp", oldHP - hitstats->HP);
+					}
+					if ( player >= 0 )
+					{
+						if ( hitstats->HP < oldHP )
+						{
+							if ( weaponType != WOODEN_SHIELD )
 							{
-								achievementRhythmOfTheKnightVec[playerhit].clear();
-								//messagePlayer(0, "used AC!");
+								Compendium_t::Events_t::eventUpdate(player, Compendium_t::CPDM_MELEE_DMG_TOTAL, weaponType, oldHP - hitstats->HP);
+							}
+							Compendium_t::Events_t::eventUpdateCodex(player, Compendium_t::CPDM_MELEE_DMG_TOTAL, "melee", oldHP - hitstats->HP);
+							Compendium_t::Events_t::eventUpdateCodex(player, Compendium_t::CPDM_MELEE_HITS, "melee", 1);
+							Compendium_t::Events_t::eventUpdateCodex(player, Compendium_t::CPDM_CLASS_MELEE_HITS_RUN, "melee", 1);
+							if ( chargeMult > 1 )
+							{
+								Compendium_t::Events_t::eventUpdateCodex(player, Compendium_t::CPDM_CRITS_DMG_TOTAL, "crits", oldHP - hitstats->HP);
+								Compendium_t::Events_t::eventUpdateCodex(player, Compendium_t::CPDM_CRIT_HITS, "crits", 1);
+								Compendium_t::Events_t::eventUpdateCodex(player, Compendium_t::CPDM_CLASS_CRITS_HITS_RUN, "crits", 1);
+							}
+							if ( flanking )
+							{
+								Compendium_t::Events_t::eventUpdateCodex(player, Compendium_t::CPDM_FLANK_DMG, "flanking", oldHP - hitstats->HP);
+								Compendium_t::Events_t::eventUpdateCodex(player, Compendium_t::CPDM_FLANK_HITS, "flanking", 1);
+								Compendium_t::Events_t::eventUpdateCodex(player, Compendium_t::CPDM_CLASS_FLANK_HITS_RUN, "flanking", 1);
+								Compendium_t::Events_t::eventUpdateCodex(player, Compendium_t::CPDM_CLASS_FLANK_DMG_RUN, "flanking", oldHP - hitstats->HP);
+							}
+							else if ( backstab )
+							{
+								Compendium_t::Events_t::eventUpdateCodex(player, Compendium_t::CPDM_BACKSTAB_HITS, "backstabs", 1);
+								Compendium_t::Events_t::eventUpdateCodex(player, Compendium_t::CPDM_CLASS_BACKSTAB_HITS_RUN, "backstabs", 1);
+								Compendium_t::Events_t::eventUpdateCodex(player, Compendium_t::CPDM_CLASS_BACKSTAB_DMG_RUN, "backstabs", oldHP - hitstats->HP);
 							}
 						}
 					}
@@ -10257,7 +11248,7 @@ void Entity::attack(int pose, int charge, Entity* target)
 					if ( thornsEffect != 0 && damage > 0 )
 					{
 						this->modHP(-abs(thornsEffect));
-						if ( myStats->HP <= 0 )
+						if ( myStats->HP <= 0 && myStats->OLDHP > myStats->HP )
 						{
 							hit.entity->awardXP(this, true, true);
 						}
@@ -10277,19 +11268,35 @@ void Entity::attack(int pose, int charge, Entity* target)
 							cameravars[player].shakey += 10;
 						}
 
-						if ( hit.entity->behavior == &actPlayer )
+						if ( player >= 0 )
 						{
-							// update enemy bar for attacker
-							if ( !strcmp(myStats->name, "") )
+							Uint32 color = makeColorRGB(255, 0, 0);
+							const char* thornsMsg = Language::get(6264); // named
+							if ( !strcmp(hitstats->name, "") || monsterNameIsGeneric(*hitstats) )
 							{
-								updateEnemyBar(hit.entity, this, getMonsterLocalizedName(myStats->type).c_str(), myStats->HP, myStats->MAXHP, false,
-									DamageGib::DMG_DEFAULT);
+								thornsMsg = Language::get(6263);
+							}
+
+							if ( !strcmp(hitstats->name, "") )
+							{
+								messagePlayerColor(player, MESSAGE_COMBAT, color, thornsMsg, getMonsterLocalizedName(hitstats->type).c_str());
 							}
 							else
 							{
-								updateEnemyBar(hit.entity, this, myStats->name, myStats->HP, myStats->MAXHP, false,
-									DamageGib::DMG_DEFAULT);
+								messagePlayerColor(player, MESSAGE_COMBAT, color, thornsMsg, hitstats->name);
 							}
+						}
+
+						// update enemy bar for attacker
+						if ( !strcmp(myStats->name, "") )
+						{
+							updateEnemyBar(hit.entity, this, getMonsterLocalizedName(myStats->type).c_str(), myStats->HP, myStats->MAXHP, false,
+								DamageGib::DMG_DEFAULT);
+						}
+						else
+						{
+							updateEnemyBar(hit.entity, this, myStats->name, myStats->HP, myStats->MAXHP, false,
+								DamageGib::DMG_DEFAULT);
 						}
 					}
 					if ( hitstats->type == INCUBUS 
@@ -10366,7 +11373,7 @@ void Entity::attack(int pose, int charge, Entity* target)
 								|| (whip && ( (flanking && local_rng.rand() % 5 == 0) || (backstab && local_rng.rand() % 2 == 0) || disarmed) )
 								|| (local_rng.rand() % 4 == 0 && pose == MONSTER_POSE_GOLEM_SMASH)
 								|| (local_rng.rand() % 4 == 0 && pose == PLAYER_POSE_GOLEM_SMASH)
-								|| (thornsEffect < 0)
+								|| (thornsEffect < 0 && behavior == &actPlayer)
 								|| (local_rng.rand() % 10 == 0 && myStats->type == VAMPIRE && myStats->weapon == nullptr)
 								|| (local_rng.rand() % 8 == 0 && myStats->EFFECTS[EFF_VAMPIRICAURA] && (myStats->weapon == nullptr || myStats->type == LICH_FIRE))
 							)
@@ -10416,7 +11423,7 @@ void Entity::attack(int pose, int charge, Entity* target)
 									}
 									hitstats->EFFECTS[EFF_BLEEDING] = true;
 									strcpy(playerHitMessage, Language::get(701));
-									if ( !strcmp(hitstats->name, "") )
+									if ( !strcmp(hitstats->name, "") || monsterNameIsGeneric(*hitstats) )
 									{
 										strcpy(monsterHitMessage, Language::get(702));
 									}
@@ -10432,7 +11439,7 @@ void Entity::attack(int pose, int charge, Entity* target)
 										hitstats->EFFECTS_TIMERS[EFF_BLEEDING] = std::max(500 + (int)local_rng.rand() % 500 - hit.entity->getCON() * 10, 250); // 5-20 seconds
 										hitstats->EFFECTS[EFF_BLEEDING] = true;
 										strcpy(playerHitMessage, Language::get(2451));
-										if ( !strcmp(hitstats->name, "") )
+										if ( !strcmp(hitstats->name, "") || monsterNameIsGeneric(*hitstats) )
 										{
 											strcpy(monsterHitMessage, Language::get(2452));
 										}
@@ -10446,7 +11453,7 @@ void Entity::attack(int pose, int charge, Entity* target)
 										hitstats->EFFECTS_TIMERS[EFF_BLEEDING] += std::max((int)local_rng.rand() % 350 - hit.entity->getCON() * 5, 100); // 2-7 seconds in addition
 										hitstats->EFFECTS[EFF_BLEEDING] = true;
 										strcpy(playerHitMessage, Language::get(2454));
-										if ( !strcmp(hitstats->name, "") )
+										if ( !strcmp(hitstats->name, "") || monsterNameIsGeneric(*hitstats) )
 										{
 											strcpy(monsterHitMessage, Language::get(2455));
 										}
@@ -10715,14 +11722,7 @@ void Entity::attack(int pose, int charge, Entity* target)
 							else
 							{
 								Uint32 color = makeColorRGB(0, 255, 0);
-								if ( !strcmp(hitstats->name, "") )
-								{
-									messagePlayerColor(player, MESSAGE_COMBAT, color, Language::get(2440), getMonsterLocalizedName(hitstats->type).c_str());
-								}
-								else
-								{
-									messagePlayerColor(player, MESSAGE_COMBAT, color, Language::get(2439), hitstats->name);
-								}
+								messagePlayerMonsterEvent(player, color, *hitstats, Language::get(2440), Language::get(2439), MSG_COMBAT);
 							}
 						}
 					}
@@ -10814,12 +11814,36 @@ void Entity::attack(int pose, int charge, Entity* target)
 							}
 						}
 					}
+
+					if ( hitstats )
+					{
+						if ( hitstats->type == BUGBEAR
+							&& hitstats->defending )
+						{
+#ifdef USE_FMOD
+
+							bool playing = false;
+							if ( hitstats->monster_sound )
+							{
+								hitstats->monster_sound->isPlaying(&playing);
+							}
+							if ( !playing )
+							{
+								if ( (hitstats->OLDHP == hitstats->HP && local_rng.rand() % 5 == 0)
+									|| (local_rng.rand() % 10 == 0) )
+								{
+									hitstats->monster_sound = playSoundEntity(hit.entity, 681 + local_rng.rand() % 2, 128);
+								}
+							}
+#endif
+						}
+					}
 				}
 			}
 		}
 		else
 		{
-			if ( (dist != STRIKERANGE && !whip) || (dist != STRIKERANGE * 1.5 && whip) )
+			if ( !miss && ((dist != STRIKERANGE && !whip) || (dist != STRIKERANGE * 1.5 && whip)) )
 			{
 				// hit a wall
 				if ( pose == PLAYER_POSE_GOLEM_SMASH )
@@ -10933,6 +11957,14 @@ void Entity::attack(int pose, int charge, Entity* target)
 									steamAchievementClient(player, "BARONY_ACH_BAD_REVIEW");
 								}
 
+								if ( behavior == &actPlayer )
+								{
+									if ( myStats->weapon && myStats->weapon->type == TOOL_PICKAXE )
+									{
+										Compendium_t::Events_t::eventUpdate(skill[2], Compendium_t::CPDM_PICKAXE_WALLS_DUG, myStats->weapon->type, 1);
+									}
+								}
+
 								map.tiles[OBSTACLELAYER + hit.mapy * MAPLAYERS + hit.mapx * MAPLAYERS * map.height] = 0;
 								// send wall destroy info to clients
 								if ( multiplayer == SERVER )
@@ -10956,17 +11988,32 @@ void Entity::attack(int pose, int charge, Entity* target)
 								generatePathMaps();
 							}
 							int chance = 2 + (myStats->type == GOBLIN ? 2 : 0);
-							if ( local_rng.rand() % chance && degradePickaxe )
+							if ( local_rng.rand() % chance && degradePickaxe && myStats->weapon )
 							{
-								myStats->weapon->status = static_cast<Status>(myStats->weapon->status - 1);
+								if ( myStats->weapon->status > BROKEN )
+								{
+									myStats->weapon->status = static_cast<Status>(myStats->weapon->status - 1);
+								}
 								if ( myStats->weapon->status == BROKEN )
 								{
 									messagePlayer(player, MESSAGE_EQUIPMENT, Language::get(704));
 									playSoundEntity(this, 76, 64);
+
+									if ( behavior == &actPlayer )
+									{
+										if ( myStats->weapon && myStats->weapon->type == TOOL_PICKAXE )
+										{
+											Compendium_t::Events_t::eventUpdate(skill[2], Compendium_t::CPDM_BROKEN, myStats->weapon->type, 1);
+										}
+									}
 								}
 								else
 								{
 									messagePlayer(player, MESSAGE_EQUIPMENT, Language::get(705));
+									if ( behavior == &actPlayer && myStats->weapon )
+									{
+										Compendium_t::Events_t::eventUpdate(player, Compendium_t::CPDM_DEGRADED, myStats->weapon->type, 1);
+									}
 								}
 								if ( player > 0 && multiplayer == SERVER && !players[player]->isLocalPlayer() )
 								{
@@ -10990,6 +12037,12 @@ void Entity::attack(int pose, int charge, Entity* target)
 					{
 						// bang
 						spawnBang(hit.x - cos(yaw) * 2, hit.y - sin(yaw) * 2, 0);
+
+						if ( behavior == &actPlayer )
+						{
+							Compendium_t::Events_t::eventUpdate(skill[2], Compendium_t::CPDM_ATTACKS_MISSES,
+								myStats->weapon->type, 1);
+						}
 					}
 				}
 				else
@@ -10997,6 +12050,59 @@ void Entity::attack(int pose, int charge, Entity* target)
 					// bang
 					//spawnBang(hit.x - cos(my->yaw)*2,hit.y - sin(my->yaw)*2,0);
 					playSoundPos(hit.x, hit.y, 183, 64);
+
+					if ( !myStats->weapon && !shapeshifted )
+					{
+						if ( myStats->gloves )
+						{
+							switch ( myStats->gloves->type )
+							{
+							case BRASS_KNUCKLES:
+							case IRON_KNUCKLES:
+							case SPIKED_GAUNTLETS:
+								if ( behavior == &actPlayer )
+								{
+									Compendium_t::Events_t::eventUpdate(skill[2], Compendium_t::CPDM_ATTACKS_MISSES,
+										myStats->gloves->type, 1);
+								}
+								break;
+							default:
+								break;
+							}
+						}
+					}
+				}
+			}
+			else
+			{
+				// hit nothing
+				if ( myStats->weapon != NULL && !shapeshifted )
+				{
+					if ( behavior == &actPlayer )
+					{
+						Compendium_t::Events_t::eventUpdate(skill[2], Compendium_t::CPDM_ATTACKS_MISSES,
+							myStats->weapon->type, 1);
+					}
+				}
+				else if ( !myStats->weapon && !shapeshifted )
+				{
+					if ( myStats->gloves )
+					{
+						switch ( myStats->gloves->type )
+						{
+						case BRASS_KNUCKLES:
+						case IRON_KNUCKLES:
+						case SPIKED_GAUNTLETS:
+							if ( behavior == &actPlayer )
+							{
+								Compendium_t::Events_t::eventUpdate(skill[2], Compendium_t::CPDM_ATTACKS_MISSES,
+									myStats->gloves->type, 1);
+							}
+							break;
+						default:
+							break;
+						}
+					}
 				}
 			}
 
@@ -11128,15 +12234,14 @@ int AC(Stat* stat)
 
 	if ( stat->shield )
 	{
-		int shieldskill = stat->getPassiveShieldBonus(true);
+		int shieldskill = stat->getPassiveShieldBonus(true, false);
 		armor += shieldskill;
 		if ( stat->defending )
 		{
 			//messagePlayer(0, "shield up! +%d", 5 + stat->PROFICIENCIES[PRO_SHIELD] / 5);
-			armor += stat->getActiveShieldBonus(true);
+			armor += stat->getActiveShieldBonus(true, false);
 		}
 	}
-
 	if ( stat->type == MIMIC && stat->EFFECTS[EFF_MIMIC_LOCKED] )
 	{
 		armor *= 2;
@@ -11774,10 +12879,51 @@ void Entity::awardXP(Entity* src, bool share, bool root)
 		return;
 	}
 
+	if ( src->behavior == &actPlayer && behavior == &actMonster && root )
+	{
+		Compendium_t::Events_t::eventUpdateMonster(src->skill[2], Compendium_t::CPDM_KILLED_BY, this, 1);
+	}
+
 	if ( src->behavior == &actMonster 
 		&& (src->monsterAllySummonRank != 0
 			|| src->monsterIsTinkeringCreation()) )
 	{
+		if ( root )
+		{
+			if ( src->monsterIsTinkeringCreation() )
+			{
+				int compendiumPlayer = behavior == &actPlayer ? skill[2] : -1;
+				if ( behavior == &actMonster )
+				{
+					if ( auto leader = monsterAllyGetPlayerLeader() )
+					{
+						compendiumPlayer = leader->skill[2];
+					}
+				}
+				if ( multiplayer == SINGLE )
+				{
+					if ( splitscreen )
+					{
+						Compendium_t::Events_t::eventUpdateMonster(compendiumPlayer, Compendium_t::CPDM_KILLED_MULTIPLAYER, src, 1);
+					}
+					else
+					{
+						Compendium_t::Events_t::eventUpdateMonster(compendiumPlayer, Compendium_t::CPDM_KILLED_SOLO, src, 1);
+					}
+				}
+				else
+				{
+					Compendium_t::Events_t::eventUpdateMonster(compendiumPlayer, Compendium_t::CPDM_KILLED_MULTIPLAYER, src, 1);
+					for ( int i = 0; i < MAXPLAYERS; ++i )
+					{
+						if ( !client_disconnected[i] )
+						{
+							Compendium_t::Events_t::eventUpdateMonster(i, Compendium_t::CPDM_KILLED_PARTY, src, 1);
+						}
+					}
+				}
+			}
+		}
 		return; // summoned monster, no XP!
 	}
 	if ( srcStats->type == INCUBUS && !strncmp(srcStats->name, "inner demon", strlen("inner demon")) )
@@ -11797,6 +12943,18 @@ void Entity::awardXP(Entity* src, bool share, bool root)
 
 	// calculate XP gain
 	int baseXp = 10;
+	if ( srcStats->type == BAT_SMALL )
+	{
+		baseXp = 1 + local_rng.rand() % 2;
+	}
+	else if ( srcStats->type == SLIME )
+	{
+		baseXp = 5;
+	}
+	else if ( srcStats->type == GNOME )
+	{
+		baseXp = 5;
+	}
 	int xpGain = baseXp + local_rng.rand() % std::max(1, baseXp) + std::max(0, srcStats->LVL - destStats->LVL) * baseXp;
 	if ( srcStats->MISC_FLAGS[STAT_FLAG_XP_PERCENT_AWARD] > 0 )
 	{
@@ -11909,11 +13067,17 @@ void Entity::awardXP(Entity* src, bool share, bool root)
 									int gain = (xpGain * numshares); // summoned monsters aren't penalised XP.
 									if ( inspiration )
 									{
+										int oldGain = gain;
 										gain *= inspirationMult;
 										if ( ((followerStats->EXP + gain) >= 100) && ((followerStats->EXP + (xpGain * numshares)) < 100) )
 										{
 											// inspiration caused us to level
 											steamAchievementEntity(this, "BARONY_ACH_BY_EXAMPLE");
+										}
+
+										if ( gain > oldGain )
+										{
+											Compendium_t::Events_t::eventUpdate(this->skill[2], Compendium_t::CPDM_INSPIRATION_XP, HAT_CROWN, gain - oldGain);
 										}
 									}
 									followerStats->EXP += gain; 
@@ -11923,11 +13087,17 @@ void Entity::awardXP(Entity* src, bool share, bool root)
 									int gain = xpGain;
 									if ( inspiration )
 									{
+										int oldGain = gain;
 										gain *= inspirationMult;
 										if ( ((followerStats->EXP + gain) >= 100) && ((followerStats->EXP + xpGain) < 100) )
 										{
 											// inspiration caused us to level
 											steamAchievementEntity(this, "BARONY_ACH_BY_EXAMPLE");
+										}
+
+										if ( gain > oldGain )
+										{
+											Compendium_t::Events_t::eventUpdate(this->skill[2], Compendium_t::CPDM_INSPIRATION_XP, HAT_CROWN, gain - oldGain);
 										}
 									}
 									followerStats->EXP += gain;
@@ -11950,6 +13120,7 @@ void Entity::awardXP(Entity* src, bool share, bool root)
 		int gain = xpGain;
 		if ( inspiration )
 		{
+			int oldGain = gain;
 			gain *= inspirationMult;
 			if ( ((destStats->EXP + gain) >= 100) && ((destStats->EXP + xpGain) < 100) )
 			{
@@ -11962,6 +13133,26 @@ void Entity::awardXP(Entity* src, bool share, bool root)
 					}
 				}
 			}
+
+			if ( gain > oldGain )
+			{
+				if ( behavior == &actMonster )
+				{
+					if ( auto leader = monsterAllyGetPlayerLeader() )
+					{
+						Compendium_t::Events_t::eventUpdate(leader->skill[2], Compendium_t::CPDM_INSPIRATION_XP, HAT_CROWN, gain - oldGain);
+					}
+				}
+			}
+		}
+
+		if ( behavior == &actPlayer )
+		{
+			Compendium_t::Events_t::eventUpdateCodex(skill[2], Compendium_t::CPDM_XP_MAX_IN_FLOOR, "xp", gain, false, -1, true);
+			Compendium_t::Events_t::eventUpdateCodex(skill[2], Compendium_t::CPDM_XP_MAX_INSTANCE, "xp", gain);
+			Compendium_t::Events_t::eventUpdateCodex(skill[2], Compendium_t::CPDM_XP_KILLS, "xp", gain);
+
+			Compendium_t::Events_t::eventUpdateMonster(skill[2], Compendium_t::CPDM_KILL_XP, src, gain);
 		}
 		destStats->EXP += gain;
 	}
@@ -11987,7 +13178,7 @@ void Entity::awardXP(Entity* src, bool share, bool root)
 	{
 		if ( src->behavior == &actPlayer && this->behavior == &actMonster )
 		{
-			achievementObserver.updateGlobalStat(getIndexForDeathType(destStats->type));
+			achievementObserver.updateGlobalStat(getIndexForDeathType(destStats->type), src->skill[2]);
 			if ( destStats->type == MIMIC )
 			{
 				steamAchievementClient(src->skill[2], "BARONY_ACH_ETERNAL_REWARD");
@@ -11997,27 +13188,27 @@ void Entity::awardXP(Entity* src, bool share, bool root)
 		{
 			if ( srcStats->type == LICH )
 			{
-				achievementObserver.updateGlobalStat(STEAM_GSTAT_HERX_SLAIN);
+				achievementObserver.updateGlobalStat(STEAM_GSTAT_HERX_SLAIN, this->skill[2]);
 			}
 			else if ( srcStats->type == LICH_FIRE )
 			{
-				achievementObserver.updateGlobalStat(STEAM_GSTAT_TWINSFIRE_SLAIN);
+				achievementObserver.updateGlobalStat(STEAM_GSTAT_TWINSFIRE_SLAIN, this->skill[2]);
 			}
 			else if ( srcStats->type == LICH_ICE )
 			{
-				achievementObserver.updateGlobalStat(STEAM_GSTAT_TWINSICE_SLAIN);
+				achievementObserver.updateGlobalStat(STEAM_GSTAT_TWINSICE_SLAIN, this->skill[2]);
 			}
 			else if ( srcStats->type == DEVIL )
 			{
-				achievementObserver.updateGlobalStat(STEAM_GSTAT_BAPHOMET_SLAIN);
+				achievementObserver.updateGlobalStat(STEAM_GSTAT_BAPHOMET_SLAIN, this->skill[2]);
 			}
 			else if ( srcStats->type == MINOTAUR )
 			{
-				achievementObserver.updateGlobalStat(STEAM_GSTAT_MINOTAURS_SLAIN);
+				achievementObserver.updateGlobalStat(STEAM_GSTAT_MINOTAURS_SLAIN, this->skill[2]);
 			}
 			else if ( srcStats->type == SHOPKEEPER )
 			{
-				achievementObserver.updateGlobalStat(STEAM_GSTAT_SHOPKEEPERS_SLAIN);
+				achievementObserver.updateGlobalStat(STEAM_GSTAT_SHOPKEEPERS_SLAIN, this->skill[2]);
 			}
 		}
 	}
@@ -12074,7 +13265,7 @@ void Entity::awardXP(Entity* src, bool share, bool root)
 		if ( root )
 		{
 			achievementObserver.awardAchievementIfActive(player, src, AchievementObserver::BARONY_ACH_TELEFRAG);
-			if ( stats[player]->playerRace == RACE_INCUBUS && stats[player]->appearance == 0 )
+			if ( stats[player]->playerRace == RACE_INCUBUS && stats[player]->stat_appearance == 0 )
 			{
 				achievementObserver.playerAchievements[player].checkTraditionKill(this, src);
 			}
@@ -12170,8 +13361,8 @@ void Entity::awardXP(Entity* src, bool share, bool root)
 			net_packet->data[8] = (Sint8)destStats->INT;
 			net_packet->data[9] = (Sint8)destStats->PER;
 			net_packet->data[10] = (Sint8)destStats->CHR;
-			net_packet->data[11] = (Sint8)destStats->EXP;
-			net_packet->data[12] = (Sint8)destStats->LVL;
+			net_packet->data[11] = (Uint8)destStats->EXP;
+			net_packet->data[12] = (Uint8)destStats->LVL;
 			SDLNet_Write16((Sint16)destStats->HP, &net_packet->data[13]);
 			SDLNet_Write16((Sint16)destStats->MAXHP, &net_packet->data[15]);
 			SDLNet_Write16((Sint16)destStats->MP, &net_packet->data[17]);
@@ -12184,6 +13375,29 @@ void Entity::awardXP(Entity* src, bool share, bool root)
 
 		if ( root )
 		{
+			if ( multiplayer == SINGLE )
+			{
+				if ( splitscreen )
+				{
+					Compendium_t::Events_t::eventUpdateMonster(player, Compendium_t::CPDM_KILLED_MULTIPLAYER, src, 1);
+				}
+				else
+				{
+					Compendium_t::Events_t::eventUpdateMonster(player, Compendium_t::CPDM_KILLED_SOLO, src, 1);
+				}
+			}
+			else
+			{
+				Compendium_t::Events_t::eventUpdateMonster(player, Compendium_t::CPDM_KILLED_MULTIPLAYER, src, 1);
+				for ( int i = 0; i < MAXPLAYERS; ++i )
+				{
+					if ( !client_disconnected[i] )
+					{
+						Compendium_t::Events_t::eventUpdateMonster(i, Compendium_t::CPDM_KILLED_PARTY, src, 1);
+					}
+				}
+			}
+
 			for ( int i = 0; i < MAXPLAYERS; ++i )
 			{
 				if ( stats[i]->helmet && stats[i]->helmet->type == HAT_BOUNTYHUNTER )
@@ -12244,14 +13458,29 @@ void Entity::awardXP(Entity* src, bool share, bool root)
 				{
 					steamAchievementClient(leader->skill[2], "BARONY_ACH_TIME_TO_PLAN");
 				}
+
+				if ( root )
+				{
+					if ( destStats && (destStats->type == SENTRYBOT || destStats->type == SPELLBOT) )
+					{
+						if ( leader->behavior == &actPlayer )
+						{
+							Compendium_t::Events_t::eventUpdate(leader->skill[2],
+								Compendium_t::CPDM_SENTRY_DEPLOY_KILLS, destStats->type == SENTRYBOT ? TOOL_SENTRYBOT : TOOL_SPELLBOT, 1);
+						}
+					}
+				}
 			}
 			else
 			{
-				leader->increaseSkill(PRO_LEADERSHIP);
+				if ( srcStats->type != BAT_SMALL )
+				{
+					leader->increaseSkill(PRO_LEADERSHIP);
+				}
 			}
 			leader->awardXP(src, true, false);
 
-			if ( leader->behavior == &actPlayer )
+			if ( leader->behavior == &actPlayer && root )
 			{
 				if ( destStats->monsterIsCharmed == 1 )
 				{
@@ -12260,12 +13489,37 @@ void Entity::awardXP(Entity* src, bool share, bool root)
 				}
 				if ( destStats->type == INSECTOID )
 				{
-					if ( leader->getStats()->playerRace == RACE_INSECTOID && leader->getStats()->appearance == 0 )
+					if ( leader->getStats()->playerRace == RACE_INSECTOID && leader->getStats()->stat_appearance == 0 )
 					{
 						steamStatisticUpdateClient(leader->skill[2], STEAM_STAT_MONARCH, STEAM_STAT_INT, 1);
 					}
 				}
 				killIncrementEvent = true;
+
+				if ( multiplayer == SINGLE )
+				{
+					if ( splitscreen )
+					{
+						Compendium_t::Events_t::eventUpdateMonster(leader->skill[2], Compendium_t::CPDM_KILLED_MULTIPLAYER, src, 1);
+					}
+					else
+					{
+						Compendium_t::Events_t::eventUpdateMonster(leader->skill[2], Compendium_t::CPDM_KILLED_SOLO, src, 1);
+					}
+				}
+				else
+				{
+					Compendium_t::Events_t::eventUpdateMonster(leader->skill[2], Compendium_t::CPDM_KILLED_MULTIPLAYER, src, 1);
+					for ( int i = 0; i < MAXPLAYERS; ++i )
+					{
+						if ( !client_disconnected[i] )
+						{
+							Compendium_t::Events_t::eventUpdateMonster(i, Compendium_t::CPDM_KILLED_PARTY, src, 1);
+						}
+					}
+				}
+
+				Compendium_t::Events_t::eventUpdateWorld(leader->skill[2], Compendium_t::CPDM_FOLLOWER_KILLS, "masons guild", 1);
 			}
 		}
 
@@ -12558,6 +13812,14 @@ bool Entity::checkEnemy(Entity* your)
 			else if ( yourStats->type == SHOPKEEPER && behavior == &actPlayer )
 			{
 				result = ShopkeeperPlayerHostility.isPlayerEnemy(this->skill[2]);
+			}
+			else if ( myStats->type == BAT_SMALL && your->behavior == &actPlayer )
+			{
+				result = true;
+			}
+			else if ( yourStats->type == BAT_SMALL && behavior == &actPlayer )
+			{
+				result = true;
 			}
 			else if ( behavior == &actPlayer && myStats->type != HUMAN )
 			{
@@ -13735,7 +14997,6 @@ bool Entity::setBootSprite(Entity* leg, int spriteOffset)
 		case KOBOLD:
 		case GOBLIN:
 		case SKELETON:
-		case GNOME:
 		case SHADOW:
 		case INCUBUS:
 		case VAMPIRE:
@@ -13764,6 +15025,36 @@ bool Entity::setBootSprite(Entity* leg, int spriteOffset)
 			else if ( myStats->shoes->type == SUEDE_BOOTS )
 			{
 				leg->sprite = 808 + (spriteOffset > 0 ? 1 : 0);
+			}
+			else
+			{
+				return false;
+			}
+			break;
+		case GNOME:
+			if ( myStats->shoes->type == LEATHER_BOOTS || myStats->shoes->type == LEATHER_BOOTS_SPEED )
+			{
+				leg->sprite = 1463 + (spriteOffset > 0 ? 1 : 0);
+			}
+			else if ( myStats->shoes->type == IRON_BOOTS || myStats->shoes->type == IRON_BOOTS_WATERWALKING )
+			{
+				leg->sprite = 1467 + (spriteOffset > 0 ? 1 : 0);
+			}
+			else if ( myStats->shoes->type >= STEEL_BOOTS && myStats->shoes->type <= STEEL_BOOTS_FEATHER )
+			{
+				leg->sprite = 1471 + (spriteOffset > 0 ? 1 : 0);
+			}
+			else if ( myStats->shoes->type == CRYSTAL_BOOTS )
+			{
+				leg->sprite = 1465 + (spriteOffset > 0 ? 1 : 0);
+			}
+			else if ( myStats->shoes->type == ARTIFACT_BOOTS )
+			{
+				leg->sprite = 1461 + (spriteOffset > 0 ? 1 : 0);
+			}
+			else if ( myStats->shoes->type == SUEDE_BOOTS )
+			{
+				leg->sprite = 1473 + (spriteOffset > 0 ? 1 : 0);
 			}
 			else
 			{
@@ -13961,7 +15252,7 @@ int getStatForProficiency(int skill)
 	return statForProficiency;
 }
 
-void Entity::setMeleeDamageSkillModifiers(Entity* my, Stat* myStats, int skill, real_t& baseSkillModifier, real_t& variance)
+void Entity::setMeleeDamageSkillModifiers(Entity* my, Stat* myStats, int skill, real_t& baseSkillModifier, real_t& variance, ItemType* itemType)
 {
 	bool shapeshifted = (my && my->behavior == &actPlayer && my->effectShapeshift != NOTHING);
 	bool gungnir = false;
@@ -13975,6 +15266,10 @@ void Entity::setMeleeDamageSkillModifiers(Entity* my, Stat* myStats, int skill, 
 		{
 			gungnir = true;
 		}
+	}
+	if ( itemType && (*itemType) == ARTIFACT_SPEAR )
+	{
+		gungnir = true;
 	}
 
 	if ( skill == PRO_UNARMED )
@@ -14258,6 +15553,7 @@ int Entity::getAttackPose() const
 				|| myStats->type == HUMAN || myStats->type == GOBLIN 
 				|| myStats->type == SKELETON || myStats->type == GNOME
 				|| myStats->type == SUCCUBUS || myStats->type == SHOPKEEPER
+				|| myStats->type == BUGBEAR
 				|| myStats->type == SHADOW )
 			{
 				if ( myStats->weapon->type == CROSSBOW || myStats->weapon->type == HEAVY_CROSSBOW )
@@ -14300,6 +15596,7 @@ int Entity::getAttackPose() const
 				|| myStats->type == HUMAN || myStats->type == GOBLIN
 				|| myStats->type == SKELETON || myStats->type == GNOME
 				|| myStats->type == SUCCUBUS || myStats->type == SHOPKEEPER
+				|| myStats->type == BUGBEAR
 				|| myStats->type == SHADOW )
 			{
 				if ( getWeaponSkill(myStats->weapon) == PRO_AXE || getWeaponSkill(myStats->weapon) == PRO_MACE
@@ -14323,7 +15620,11 @@ int Entity::getAttackPose() const
 	else
 	{
 	    const auto type = myStats->type;
-		if (type == KOBOLD || type == AUTOMATON ||
+		if ( myStats->type == SLIME && this->monsterSpecialTimer == MONSTER_SPECIAL_COOLDOWN_SLIME_SPRAY )
+		{
+			pose = MONSTER_POSE_MAGIC_WINDUP2;
+		}
+		else if (type == KOBOLD || type == AUTOMATON ||
 			type == GOATMAN || type == INSECTOID ||
 			type == INCUBUS || type == VAMPIRE ||
 			type == HUMAN || type == GOBLIN ||
@@ -14332,7 +15633,7 @@ int Entity::getAttackPose() const
 			type == CREATURE_IMP || type == SUCCUBUS ||
 			type == SHOPKEEPER || type == MINOTAUR ||
 			type == SHADOW || type == RAT || type == SPIDER || type == CRAB ||
-			type == MIMIC ||
+			type == MIMIC || type == BAT_SMALL ||
 			type == SLIME || (type == SCARAB && sprite != 1078 && sprite != 1079))
 		{
 			pose = MONSTER_POSE_MELEE_WINDUP1;
@@ -14364,6 +15665,10 @@ int Entity::getAttackPose() const
 			}
 		}
 		else if ( myStats->type == TROLL )
+		{
+			pose = MONSTER_POSE_MELEE_WINDUP1;
+		}
+		else if ( myStats->type == BUGBEAR )
 		{
 			pose = MONSTER_POSE_MELEE_WINDUP1;
 		}
@@ -14875,7 +16180,7 @@ void Entity::humanoidAnimateWalk(Entity* limb, node_t* bodypartNode, int bodypar
 		if ( shieldNode )
 		{
 			Entity* shield = (Entity*)shieldNode->element;
-			if ( dist > 0.1 && (bodypart != LIMB_HUMANOID_LEFTARM || shield->sprite == 0) )
+			if ( dist > 0.1 && (bodypart != LIMB_HUMANOID_LEFTARM || shield->sprite <= 0) )
 			{
 				// walking to destination
 				if ( !rightbody->skill[0] )
@@ -15033,30 +16338,32 @@ Uint32 Entity::getMonsterFootstepSound(int footstepType, int bootSprite)
 			sound = 115;
 			break;
 		case MONSTER_FOOTSTEP_LEATHER:
-			sound = local_rng.rand() % 7;
+		{
+			static std::vector<int> leatherSteps{ 0, 3, 4, 5, 6 };
+			sound = leatherSteps[local_rng.rand() % leatherSteps.size()];
 			break;
+		}
 		case MONSTER_FOOTSTEP_USE_BOOTS:
+		{
 			if ( bootSprite >= 152 && bootSprite <= 155 ) // iron boots
 			{
-				sound = 7 + local_rng.rand() % 7;
+				static std::vector<int> ironSteps{ 7, 10, 11, 12, 13 };
+				sound = ironSteps[local_rng.rand() % ironSteps.size()];
 			}
-			else if ( bootSprite >= 156 && bootSprite <= 159 ) // steel boots
+			else if ( (bootSprite >= 156 && bootSprite <= 159) // steel boots
+				|| (bootSprite >= 499 && bootSprite <= 502) // crystal boots
+				|| (bootSprite >= 521 && bootSprite <= 524) ) // artifact boots
 			{
-				sound = 14 + local_rng.rand() % 7;
-			}
-			else if ( bootSprite >= 499 && bootSprite <= 502 ) // crystal boots
-			{
-				sound = 14 + local_rng.rand() % 7;
-			}
-			else if ( bootSprite >= 521 && bootSprite <= 524 ) // artifact boots
-			{
-				sound = 14 + local_rng.rand() % 7;
+				static std::vector<int> steelSteps{ 14, 15, 16, 17, 18, 19, 20 };
+				sound = steelSteps[local_rng.rand() % steelSteps.size()];
 			}
 			else
 			{
-				sound = local_rng.rand() % 7;
+				static std::vector<int> defaultSteps{ 0, 3, 4, 5, 6 };
+				sound = defaultSteps[local_rng.rand() % defaultSteps.size()];
 			}
 			break;
+		}
 		case MONSTER_FOOTSTEP_NONE:
 		default:
 			break;
@@ -15079,7 +16386,7 @@ void Entity::handleHumanoidWeaponLimb(Entity* weaponLimb, Entity* weaponArmLimb)
 		myAttack = this->skill[9];
 	}
 
-	if ( weaponLimb->flags[INVISIBLE] == false ) //TODO: isInvisible()?
+	if ( weaponLimb->flags[INVISIBLE] == false || weaponLimb->flags[INVISIBLE_DITHER] ) //TODO: isInvisible()?
 	{
 		if ( weaponLimb->sprite == items[SHORTBOW].index )
 		{
@@ -15142,13 +16449,27 @@ void Entity::handleHumanoidWeaponLimb(Entity* weaponLimb, Entity* weaponArmLimb)
 				if ( weaponArmLimb->skill[1] < 2 && weaponArmLimb->pitch < PI / 2 )
 				{
 					// cos(weaponArmLimb->pitch)) * cos(weaponArmLimb->yaw) allows forward/back motion dependent on the arm rotation.
-					weaponLimb->x = weaponArmLimb->x + (3 * cos(weaponArmLimb->pitch)) * cos(weaponArmLimb->yaw);
-					weaponLimb->y = weaponArmLimb->y + (3 * cos(weaponArmLimb->pitch)) * sin(weaponArmLimb->yaw);
+					real_t forward = 3.0;
+					if ( monsterType == BUGBEAR )
+					{
+						forward = limbs[BUGBEAR][18][0];
+					}
+
+					weaponLimb->x = weaponArmLimb->x + (forward * cos(weaponArmLimb->pitch)) * cos(weaponArmLimb->yaw);
+					weaponLimb->y = weaponArmLimb->y + (forward * cos(weaponArmLimb->pitch)) * sin(weaponArmLimb->yaw);
 
 					if ( weaponArmLimb->pitch < PI / 3 )
 					{
 						// adjust the z point halfway through swing.
-						weaponLimb->z = weaponArmLimb->z + 1.5 - 2 * cos(weaponArmLimb->pitch / 2);
+						if ( monsterType == BUGBEAR )
+						{
+							weaponLimb->z = weaponArmLimb->z;
+							weaponLimb->z += limbs[BUGBEAR][18][1] * sin(weaponArmLimb->pitch * 2);
+						}
+						else
+						{
+							weaponLimb->z = weaponArmLimb->z + 1.5 - 2 * cos(weaponArmLimb->pitch / 2);
+						}
 						if ( monsterType == INCUBUS || monsterType == SUCCUBUS )
 						{
 							weaponLimb->z += 2;
@@ -15156,7 +16477,15 @@ void Entity::handleHumanoidWeaponLimb(Entity* weaponLimb, Entity* weaponArmLimb)
 					}
 					else
 					{
-						weaponLimb->z = weaponArmLimb->z - .5 * (myAttack == 0);
+						if ( monsterType == BUGBEAR )
+						{
+							weaponLimb->z = weaponArmLimb->z;
+							weaponLimb->z += limbs[BUGBEAR][18][2] * sin(weaponArmLimb->pitch * 2);
+						}
+						else
+						{
+							weaponLimb->z = weaponArmLimb->z - .5 * (myAttack == 0);
+						}
 						if ( weaponLimb->pitch > PI / 2 )
 						{
 							limbAnimateToLimit(weaponLimb, ANIMATE_PITCH, -0.5, PI * 0.5, false, 0);
@@ -15177,6 +16506,10 @@ void Entity::handleHumanoidWeaponLimb(Entity* weaponLimb, Entity* weaponArmLimb)
 					weaponLimb->x = weaponArmLimb->x + .5 * cos(weaponArmLimb->yaw) * (myAttack == 0);
 					weaponLimb->y = weaponArmLimb->y + .5 * sin(weaponArmLimb->yaw) * (myAttack == 0);
 					weaponLimb->z = weaponArmLimb->z - .5;
+					if ( monsterType == BUGBEAR )
+					{
+						weaponLimb->z = weaponArmLimb->z;
+					}
 					weaponLimb->pitch = weaponArmLimb->pitch + .25 * (myAttack == 0);
 					if ( monsterType == INCUBUS || monsterType == SUCCUBUS )
 					{
@@ -15190,6 +16523,16 @@ void Entity::handleHumanoidWeaponLimb(Entity* weaponLimb, Entity* weaponArmLimb)
 				weaponLimb->y = weaponArmLimb->y + .5 * sin(weaponArmLimb->yaw) * (myAttack == 0);
 				weaponLimb->z = weaponArmLimb->z - .5 * (myAttack == 0);
 				weaponLimb->pitch = weaponArmLimb->pitch + .25 * (myAttack == 0);
+				if ( monsterType == BUGBEAR )
+				{
+					if ( !isPlayer && this->monsterArmbended )
+					{
+						weaponLimb->x = weaponArmLimb->x;
+						weaponLimb->y = weaponArmLimb->y;
+						weaponLimb->z = weaponArmLimb->z;
+						weaponLimb->pitch = weaponArmLimb->pitch;
+					}
+				}
 			}
 		}
 	}
@@ -16044,7 +17387,7 @@ void Entity::monsterAcquireAttackTarget(const Entity& target, Sint32 state, bool
 	bool hadOldTarget = (uidToEntity(monsterTarget) != nullptr);
 	Sint32 oldMonsterState = monsterState;
 
-	if ( target.getRace() == GYROBOT || target.isInertMimic() )
+	if ( target.getRace() == GYROBOT || target.isInertMimic() || target.isUntargetableBat() )
 	{
 		return;
 	}
@@ -16063,6 +17406,10 @@ void Entity::monsterAcquireAttackTarget(const Entity& target, Sint32 state, bool
 		}
 	}
 	else if ( myStats->type == MIMIC && isInertMimic() )
+	{
+		return;
+	}
+	else if ( myStats->type == BAT_SMALL && monsterSpecialState == BAT_REST )
 	{
 		return;
 	}
@@ -16119,6 +17466,17 @@ void Entity::monsterAcquireAttackTarget(const Entity& target, Sint32 state, bool
 		if ( monsterState == MONSTER_STATE_WAIT )
 		{
 			return;
+		}
+	}
+	else if ( myStats->type == BUGBEAR )
+	{
+		Stat* targetStats = target.getStats();
+		if ( targetStats && targetStats->type == BUGBEAR )
+		{
+			if ( (targetStats && targetStats->leader_uid == getUID()) || target.parent == getUID() )
+			{
+				return;
+			}
 		}
 	}
 
@@ -16596,16 +17954,28 @@ bool Entity::monsterAddNearbyItemToInventory(Stat* myStats, int rangeToFind, int
 									//messagePlayer(owner->skill[2], MESSAGE_WORLD, Language::get(3888), myStats->name);
 									players[c]->worldUI.worldTooltipDialogue.createDialogueTooltip(getUID(),
 										Player::WorldUI_t::WorldTooltipDialogue_t::DIALOGUE_BROADCAST, Language::get(3888));
+									if ( c == owner->skill[2] )
+									{
+										Compendium_t::Events_t::eventUpdateMonster(owner->skill[2], Compendium_t::CPDM_MERCHANT_ORBS, this, 1);
+									}
 									break;
 								case ARTIFACT_ORB_BLUE:
 									//messagePlayer(owner->skill[2], MESSAGE_WORLD, Language::get(3889), myStats->name);
 									players[c]->worldUI.worldTooltipDialogue.createDialogueTooltip(getUID(),
 										Player::WorldUI_t::WorldTooltipDialogue_t::DIALOGUE_BROADCAST, Language::get(3889));
+									if ( c == owner->skill[2] )
+									{
+										Compendium_t::Events_t::eventUpdateMonster(owner->skill[2], Compendium_t::CPDM_MERCHANT_ORBS, this, 1);
+									}
 									break;
 								case ARTIFACT_ORB_RED:
 									//messagePlayer(owner->skill[2], MESSAGE_WORLD, Language::get(3890), myStats->name);
 									players[c]->worldUI.worldTooltipDialogue.createDialogueTooltip(getUID(),
 										Player::WorldUI_t::WorldTooltipDialogue_t::DIALOGUE_BROADCAST, Language::get(3890));
+									if ( c == owner->skill[2] )
+									{
+										Compendium_t::Events_t::eventUpdateMonster(owner->skill[2], Compendium_t::CPDM_MERCHANT_ORBS, this, 1);
+									}
 									break;
 								default:
 									break;
@@ -17346,7 +18716,7 @@ Item* Entity::getBestShieldIHave() const
 
 void Entity::degradeArmor(Stat& hitstats, Item& armor, int armornum)
 {
-	if ( hitstats.type == SHADOW )
+	if ( hitstats.type == SHADOW || hitstats.type == LICH || hitstats.type == LICH_FIRE || hitstats.type == LICH_ICE )
 	{
 		return; //Shadows' armor and shields don't break.
 	}
@@ -17359,6 +18729,7 @@ void Entity::degradeArmor(Stat& hitstats, Item& armor, int armornum)
 	if ( armor.type == ARTIFACT_BOOTS
 		|| armor.type == ARTIFACT_HELM
 		|| armor.type == ARTIFACT_CLOAK
+		|| armor.type == CLOAK_GUARDIAN
 		|| armor.type == ARTIFACT_GLOVES
 		|| armor.type == ARTIFACT_BREASTPIECE
 		|| armor.type == MASK_ARTIFACT_VISOR )
@@ -17416,7 +18787,11 @@ void Entity::degradeArmor(Stat& hitstats, Item& armor, int armornum)
 			net_packet->len = 8;
 			sendPacketSafe(net_sock, -1, net_packet, playerhit - 1);
 		}
-
+		if ( hitstats.defending )
+		{
+			Compendium_t::Events_t::eventUpdate(playerhit, Compendium_t::CPDM_BROKEN_BY_BLOCKING, armor.type, 1);
+		}
+		Compendium_t::Events_t::eventUpdate(playerhit, Compendium_t::CPDM_BROKEN, armor.type, 1);
 		return;
 	}
 
@@ -17439,6 +18814,10 @@ void Entity::degradeArmor(Stat& hitstats, Item& armor, int armornum)
 		{
 			messagePlayer(playerhit, MESSAGE_EQUIPMENT, Language::get(681), armor.getName());
 		}
+		if ( playerhit >= 0 )
+		{
+			Compendium_t::Events_t::eventUpdate(playerhit, Compendium_t::CPDM_DEGRADED, armor.type, 1);
+		}
 	}
 	else
 	{
@@ -17456,6 +18835,15 @@ void Entity::degradeArmor(Stat& hitstats, Item& armor, int armornum)
 		{
 			playSoundEntity(this, 76, 64);
 			messagePlayer(playerhit, MESSAGE_EQUIPMENT, Language::get(682), armor.getName());
+		}
+		if ( playerhit >= 0 )
+		{
+			if ( hitstats.defending )
+			{
+				Compendium_t::Events_t::eventUpdate(playerhit, Compendium_t::CPDM_DEGRADED, armor.type, 1);
+				Compendium_t::Events_t::eventUpdate(playerhit, Compendium_t::CPDM_BROKEN_BY_BLOCKING, armor.type, 1);
+			}
+			Compendium_t::Events_t::eventUpdate(playerhit, Compendium_t::CPDM_BROKEN, armor.type, 1);
 		}
 	}
 	if ( playerhit > 0 && multiplayer == SERVER && !players[playerhit]->isLocalPlayer() )
@@ -17521,6 +18909,16 @@ bool Entity::shouldRetreat(Stat& myStats)
 	else if ( myStats.type == MIMIC )
 	{
 		return false;
+	}
+	else if ( myStats.type == GNOME )
+	{
+		if ( myStats.getAttribute("gnome_type").find("_melee") != std::string::npos )
+		{
+			if ( myStats.leader_uid != 0 )
+			{
+				return false;
+			}
+		}
 	}
 	else if ( myStats.type == LICH_FIRE )
 	{
@@ -17648,7 +19046,7 @@ bool Entity::backupWithRangedWeapon(Stat& myStats, int dist, int hasrangedweapon
 			{
 				if ( target->behavior == &actMonster && target->monsterTarget == getUID() ) // my target is attacking me
 				{
-					if ( entityDist(this, target) < TOUCHRANGE * 2 )
+					if ( dist < TOUCHRANGE * 2 )
 					{
 						return true;
 					}
@@ -18168,7 +19566,7 @@ int Entity::getManaRegenInterval(Entity* my, Stat& myStats, bool isPlayer)
 			return floatRegenTime;
 		}
 	}
-	else if ( isPlayer && myStats.playerRace == RACE_INSECTOID && myStats.appearance == 0 )
+	else if ( isPlayer && myStats.playerRace == RACE_INSECTOID && myStats.stat_appearance == 0 )
 	{
 		if ( !(svFlags & SV_FLAG_HUNGER) )
 		{
@@ -18279,13 +19677,6 @@ int Entity::getHealringFromEquipment(Entity* my, Stat& myStats, bool isPlayer)
 
 int Entity::getHealthRegenInterval(Entity* my, Stat& myStats, bool isPlayer)
 {
-	if ( !(svFlags & SV_FLAG_HUNGER) )
-	{
-		if ( isPlayer )
-		{
-			return -1;
-		}
-	}
 	if ( myStats.EFFECTS[EFF_VAMPIRICAURA] )
 	{
 		if ( isPlayer && myStats.EFFECTS_TIMERS[EFF_VAMPIRICAURA] > 0 )
@@ -18302,18 +19693,53 @@ int Entity::getHealthRegenInterval(Entity* my, Stat& myStats, bool isPlayer)
 	{
 		return -1;
 	}
-	double healring = 0;
-	if ( isPlayer && myStats.type != HUMAN )
+
+	if ( svFlags & SV_FLAG_HUNGER )
 	{
-		if ( myStats.type == SKELETON )
+		if ( isPlayer )
 		{
-			healring = -1; // 0.25x regen speed.
+			if ( myStats.HUNGER <= 0 )
+			{
+				bool doStarvation = true;
+				if ( myStats.type == AUTOMATON )
+				{
+					if ( myStats.MP > 0 )
+					{
+						doStarvation = false;
+					}
+				}
+				else if ( myStats.type == SKELETON )
+				{
+					doStarvation = false;
+				}
+				if ( doStarvation )
+				{
+					return -1;
+				}
+			}
 		}
 	}
 
+	double healring = 0;
 	double bonusHealring = 0.0;
-	bonusHealring += Entity::getHealringFromEquipment(my, myStats, isPlayer);
-	bonusHealring += Entity::getHealringFromEffects(my, myStats);
+	if ( myStats.type == SKELETON && isPlayer )
+	{
+		healring = -1;
+	}
+	if ( !(svFlags & SV_FLAG_HUNGER) && isPlayer )
+	{
+		bonusHealring += Entity::getHealringFromEquipment(my, myStats, isPlayer);
+		bonusHealring += Entity::getHealringFromEffects(my, myStats);
+		if ( bonusHealring < 0.01 && myStats.type != SKELETON )
+		{
+			return -1;
+		}
+	}
+	else
+	{
+		bonusHealring += Entity::getHealringFromEquipment(my, myStats, isPlayer);
+		bonusHealring += Entity::getHealringFromEffects(my, myStats);
+	}
 	healring += bonusHealring;
 
 	if ( my && bonusHealring >= 2.0 && ::ticks % TICKS_PER_SECOND == 0 && isPlayer )
@@ -18340,7 +19766,14 @@ int Entity::getHealthRegenInterval(Entity* my, Stat& myStats, bool isPlayer)
 
 	if ( healring > 0 )
 	{
-		return (HEAL_TIME / (healring * 6)); // 1 HP each 12 sec base
+		if ( !(svFlags & SV_FLAG_HUNGER) && isPlayer )
+		{
+			return (HEAL_TIME / (healring * 4)); // 1 HP each 12 sec base
+		}
+		else
+		{
+			return (HEAL_TIME / (healring * 6)); // 1 HP each 12 sec base
+		}
 	}
 	else if ( healring < 0 )
 	{
@@ -18818,11 +20251,7 @@ void messagePlayerMonsterEvent(int player, Uint32 color, Stat& monsterStats, con
 			{
 				messagePlayerColor(player, MESSAGE_COMBAT, color, msgGeneric, monsterStats.name);
 			}
-			else if ( monsterType < KOBOLD ) //Original monster count
-			{
-				messagePlayerColor(player, MESSAGE_COMBAT, color, msgNamed, monsterStats.name);
-			}
-			else if ( monsterType >= KOBOLD ) //New monsters
+			else
 			{
 				messagePlayerColor(player, MESSAGE_COMBAT, color, msgNamed, monsterStats.name);
 			}
@@ -18832,11 +20261,7 @@ void messagePlayerMonsterEvent(int player, Uint32 color, Stat& monsterStats, con
 			{
 				messagePlayerColor(player, MESSAGE_COMBAT_BASIC, color, msgGeneric, monsterStats.name);
 			}
-			else if ( monsterType < KOBOLD ) //Original monster count
-			{
-				messagePlayerColor(player, MESSAGE_COMBAT_BASIC, color, msgNamed, monsterStats.name);
-			}
-			else if ( monsterType >= KOBOLD ) //New monsters
+			else
 			{
 				messagePlayerColor(player, MESSAGE_COMBAT_BASIC, color, msgNamed, monsterStats.name);
 			}
@@ -18896,11 +20321,7 @@ void messagePlayerMonsterEvent(int player, Uint32 color, Stat& monsterStats, con
 				{
 					messagePlayerColor(player, MESSAGE_COMBAT, color, msgGeneric, monsterStats.name, monsterStats.weapon->getName());
 				}
-				else if ( monsterType < KOBOLD ) //Original monster count
-				{
-					messagePlayerColor(player, MESSAGE_COMBAT, color, msgNamed, monsterStats.name, monsterStats.weapon->getName());
-				}
-				else if ( monsterType >= KOBOLD ) //New monsters
+				else
 				{
 					messagePlayerColor(player, MESSAGE_COMBAT, color, msgNamed, monsterStats.name, monsterStats.weapon->getName());
 				}
@@ -19629,7 +21050,10 @@ bool monsterNameIsGeneric(Stat& monsterStats)
 		|| strstr(monsterStats.name, "training")
 		|| strstr(monsterStats.name, "Training")
 		|| strstr(monsterStats.name, "Mysterious")
-		|| strstr(monsterStats.name, "shaman") )
+		|| strstr(monsterStats.name, "shaman")
+		|| !strcmp(monsterStats.name, Language::get(6302)) // gnome thief
+		|| !strcmp(monsterStats.name, Language::get(6303)) // gnome thief leader
+		|| strstr(monsterStats.name, getMonsterLocalizedName(SLIME).c_str()) )
 	{
 		// If true, pretend the monster doesn't have a name and use the generic message "You hit the lesser skeleton!"
 		return true;
@@ -19751,6 +21175,109 @@ void Entity::setHumanoidLimbOffset(Entity* limb, Monster race, int limbType)
 	}
 	switch ( race )
 	{
+		case GNOME:
+			if ( limbType == LIMB_HUMANOID_TORSO )
+			{
+				limb->x -= .25 * cos(this->yaw);
+				limb->y -= .25 * sin(this->yaw);
+				limb->z += 1.25;
+
+				if ( limb->sprite == 1431 )
+				{
+					limb->focalx += 0.25;
+				}
+				else if ( limb->sprite == 296 )
+				{
+					limb->focalx += 0.5;
+				}
+
+				if ( limb->sprite != 1427 && limb->sprite != 1431 && limb->sprite != 296 )
+				{
+					limb->focalz -= 0.25;
+				}
+				if (limb->sprite == items[MACHINIST_APRON].indexShort)
+				{
+					limb->focalx -= 0.25;
+					limb->focalz += 0.5;
+				}
+
+				limb->scalex = limbs[GNOME][11][0];
+				limb->scaley = limbs[GNOME][11][1];
+				limb->scalez = limbs[GNOME][11][2];
+			}
+			else if ( limbType == LIMB_HUMANOID_RIGHTLEG )
+			{
+				limb->x += 1.25 * cos(this->yaw + PI / 2);
+				limb->y += 1.25 * sin(this->yaw + PI / 2);
+				limb->z += 2.25;
+				if ( limb->sprite == 1469 || limb->sprite == 1470 )
+				{
+					limb->focalx += 0.5;
+				}
+				if ( this->z >= 3.9 && this->z <= 4.1 )
+				{
+					limb->yaw += PI / 8;
+					limb->pitch = -PI / 2;
+				}
+			}
+			else if ( limbType == LIMB_HUMANOID_LEFTLEG )
+			{
+				limb->x -= 1.25 * cos(this->yaw + PI / 2);
+				limb->y -= 1.25 * sin(this->yaw + PI / 2);
+				limb->z += 2.25;
+				if ( limb->sprite == 1469 || limb->sprite == 1470 )
+				{
+					limb->focalx += 0.5;
+				}
+				if ( this->z >= 3.9 && this->z <= 4.1 )
+				{
+					limb->yaw -= PI / 8;
+					limb->pitch = -PI / 2;
+				}
+			}
+			else if ( limbType == LIMB_HUMANOID_RIGHTARM )
+			{
+				limb->x += 2.5 * cos(this->yaw + PI / 2) - .75 * cos(this->yaw);
+				limb->y += 2.5 * sin(this->yaw + PI / 2) - .75 * sin(this->yaw);
+				limb->z -= .25;
+				if ( this->z >= 3.9 && this->z <= 4.1 )
+				{
+					limb->pitch = 0;
+				}
+
+				if ( limb->sprite != 1434
+					&& limb->sprite != 299 )
+				{
+					limb->x -= 0.25 * cos(this->yaw + PI / 2);
+					limb->y -= 0.25 * sin(this->yaw + PI / 2);
+				}
+				if ( limb->sprite == 1434 )
+				{
+					limb->focalz -= 0.25;
+				}
+			}
+			else if ( limbType == LIMB_HUMANOID_LEFTARM )
+			{
+				limb->x -= 2.5 * cos(this->yaw + PI / 2) + .75 * cos(this->yaw);
+				limb->y -= 2.5 * sin(this->yaw + PI / 2) + .75 * sin(this->yaw);
+				limb->z -= .25;
+				if ( this->z >= 3.9 && this->z <= 4.1 )
+				{
+					limb->pitch = 0;
+				}
+
+				if ( limb->sprite != 1436
+					&& limb->sprite != 301 )
+				{
+					limb->x += 0.25 * cos(this->yaw + PI / 2);
+					limb->y += 0.25 * sin(this->yaw + PI / 2);
+				}
+				if ( limb->sprite == 1436 )
+				{
+					limb->focalz -= 0.25;
+				}
+			}
+			break;
 		case CREATURE_IMP:
 			if ( limbType == LIMB_HUMANOID_TORSO )
 			{
@@ -20168,6 +21695,14 @@ void Entity::handleHumanoidShieldLimb(Entity* shieldLimb, Entity* shieldArmLimb)
 
 	switch ( race )
 	{
+		case BUGBEAR:
+			shieldLimb->x -= limbs[race][19][0] * cos(this->yaw + PI / 2) + limbs[race][19][1] * cos(this->yaw);
+			shieldLimb->y -= limbs[race][19][0] * sin(this->yaw + PI / 2) + limbs[race][19][1] * sin(this->yaw);
+			shieldLimb->z += limbs[race][19][2];
+			shieldLimb->yaw = shieldArmLimb->yaw;
+			shieldLimb->roll = 0;
+			shieldLimb->pitch = shieldArmLimb->pitch;
+		break;
 		case CREATURE_IMP:
 			shieldLimb->focalx = limbs[race][8][0];
 			shieldLimb->focaly = limbs[race][8][1];
@@ -20193,6 +21728,90 @@ void Entity::handleHumanoidShieldLimb(Entity* shieldLimb, Entity* shieldArmLimb)
 				shieldLimb->scalex = 0.8;
 				shieldLimb->scaley = 0.8;
 				shieldLimb->scalez = 0.8;
+			}
+			break;
+		case GNOME:
+			shieldLimb->x -= 2.5 * cos(this->yaw + PI / 2) + .20 * cos(this->yaw);
+			shieldLimb->y -= 2.5 * sin(this->yaw + PI / 2) + .20 * sin(this->yaw);
+			shieldLimb->z += 1;
+			shieldLimb->yaw = shieldArmLimb->yaw;
+			shieldLimb->roll = 0;
+			shieldLimb->pitch = 0;
+
+			if ( shieldLimb->sprite == items[TOOL_LANTERN].index )
+			{
+				shieldLimb->z += 2;
+			}
+			if ( flickerLights || ticks % TICKS_PER_SECOND == 1 )
+			{
+				if ( shieldLimb->sprite == items[TOOL_TORCH].index )
+				{
+					if ( flameEntity = spawnFlame(shieldLimb, SPRITE_FLAME) )
+					{
+						flameEntity->x += 2 * cos(shieldArmLimb->yaw);
+						flameEntity->y += 2 * sin(shieldArmLimb->yaw);
+						flameEntity->z -= 2;
+					}
+				}
+				else if ( shieldLimb->sprite == items[TOOL_CRYSTALSHARD].index )
+				{
+					/*flameEntity = spawnFlame(shieldLimb, SPRITE_CRYSTALFLAME);
+					flameEntity->x += 2 * cos(shieldArmLimb->yaw);
+					flameEntity->y += 2 * sin(shieldArmLimb->yaw);
+					flameEntity->z -= 2;*/
+				}
+				else if ( shieldLimb->sprite == items[TOOL_LANTERN].index )
+				{
+					if ( flameEntity = spawnFlame(shieldLimb, SPRITE_FLAME) )
+					{
+						flameEntity->x += 2 * cos(shieldArmLimb->yaw);
+						flameEntity->y += 2 * sin(shieldArmLimb->yaw);
+						flameEntity->z += 1;
+					}
+				}
+			}
+			if ( itemSpriteIsQuiverThirdPersonModel(shieldLimb->sprite) )
+			{
+				shieldLimb->focalz += 3;
+				shieldLimb->scalex = 1.05;
+				shieldLimb->x -= -0.25 * cos(this->yaw + PI / 2) + 1.25 * cos(this->yaw);
+				shieldLimb->y -= -0.25 * sin(this->yaw + PI / 2) + 1.25 * sin(this->yaw);
+				shieldLimb->z += -1.28;
+			}
+			else if ( shieldLimb->sprite >= items[SPELLBOOK_LIGHT].index
+				&& shieldLimb->sprite < (items[SPELLBOOK_LIGHT].index + items[SPELLBOOK_LIGHT].variations) )
+			{
+				shieldLimb->pitch = shieldArmLimb->pitch - .25 + 3 * PI / 2;
+				shieldLimb->yaw += PI / 6;
+				shieldLimb->focalx -= 4;
+				shieldLimb->focalz += .5;
+				shieldLimb->x += 0.5 * cos(this->yaw + PI / 2) + .5 * cos(this->yaw);
+				shieldLimb->y += 0.5 * sin(this->yaw + PI / 2) + .5 * sin(this->yaw);
+				shieldLimb->z -= 1;
+				shieldLimb->scalex = 0.8;
+				shieldLimb->scaley = 0.8;
+				shieldLimb->scalez = 0.8;
+			}
+			if ( this->fskill[8] > PI / 32 ) //MONSTER_SHIELDYAW and PLAYER_SHIELDYAW defending animation
+			{
+				if ( shieldLimb->sprite != items[TOOL_TORCH].index
+					&& shieldLimb->sprite != items[TOOL_LANTERN].index
+					&& shieldLimb->sprite != items[TOOL_CRYSTALSHARD].index )
+				{
+					// shield, so rotate a little.
+					shieldLimb->roll += PI / 64;
+				}
+				else
+				{
+					shieldLimb->x += 0.25 * cos(this->yaw);
+					shieldLimb->y += 0.25 * sin(this->yaw);
+					shieldLimb->pitch += PI / 16;
+					if ( flameEntity )
+					{
+						flameEntity->x += 0.75 * cos(shieldArmLimb->yaw);
+						flameEntity->y += 0.75 * sin(shieldArmLimb->yaw);
+					}
+				}
 			}
 			break;
 		case HUMAN:
@@ -20669,6 +22288,7 @@ void Entity::handleKnockbackDamage(Stat& myStats, Entity* knockedInto)
 			if ( whoKnockedMe && whoKnockedMe->behavior == &actPlayer )
 			{
 				steamStatisticUpdateClient(whoKnockedMe->skill[2], STEAM_STAT_TAKE_THIS_OUTSIDE, STEAM_STAT_INT, 1);
+				Compendium_t::Events_t::eventUpdateWorld(whoKnockedMe->skill[2], Compendium_t::CPDM_DOOR_BROKEN, "door", 1);
 			}
 			knockedInto->doorHealth = 0;    // smash doors instantly
 			playSoundEntity(knockedInto, 28, 64);
@@ -20711,7 +22331,10 @@ void Entity::setHelmetLimbOffsetWithMask(Entity* helm, Entity* mask)
 		return;
 	}
 
-	if ( !mask->flags[INVISIBLE] && !helm->flags[INVISIBLE] )
+	bool maskVisible = (!mask->flags[INVISIBLE]) || (mask->flags[INVISIBLE] && mask->flags[INVISIBLE_DITHER]);
+	bool helmVisible = (!helm->flags[INVISIBLE]) || (helm->flags[INVISIBLE] && helm->flags[INVISIBLE_DITHER]);
+
+	if ( maskVisible && helmVisible )
 	{
 		helm->scalex = 1.01;
 		helm->scaley = 1.01;
@@ -20935,7 +22558,7 @@ bool monsterChangesColorWhenAlly(Stat* myStats, Entity* entity)
 		race = myStats->type;
 	}
 	
-	if ( race == HUMAN || race == SENTRYBOT || race == NOTHING
+	if ( race == HUMAN || race == SENTRYBOT || race == NOTHING || race == SLIME
 		|| race == SPELLBOT || race == AUTOMATON || race == GYROBOT || race == DUMMYBOT )
 	{
 		return false;
@@ -21023,6 +22646,10 @@ void Entity::handleQuiverThirdPersonModel(Stat& myStats)
 			case AUTOMATON:
 				sprite += 2; // short strap
 				break;
+			case KOBOLD:
+			case GNOME:
+				// no strap.
+				break;
 			default:
 				sprite += 3; // shoulderpad-less.
 				break;
@@ -21071,12 +22698,27 @@ real_t Entity::getDamageTableMultiplier(Entity* my, Stat& myStats, DamageTableTy
 	{
 		bonus = -.2;
 	}
+	if ( damageType == DamageTableType::DAMAGE_TABLE_MAGIC
+		&& myStats.type == BUGBEAR && myStats.defending && myStats.shield )
+	{
+		damageMultiplier = 0.1;
+	}
 	int followerResist = my ? my->getFollowerBonusDamageResist() : 0;
 	if ( followerResist != 0 )
 	{
 		bonus += -followerResist / 100.0;
 	}
-	return std::max(0.0, damageMultiplier + bonus);
+
+	if ( myStats.cloak && myStats.cloak->type == CLOAK_GUARDIAN )
+	{
+		real_t res = 0.25;
+		if ( myStats.cloak->beatitude >= 0 || shouldInvertEquipmentBeatitude(&myStats) )
+		{
+			res = std::min(0.75, 0.25 + 0.25 * (abs(myStats.cloak->beatitude)));
+		}
+		bonus -= res;
+	}
+	return std::max(0.1, damageMultiplier + bonus);
 }
 
 void Entity::createWorldUITooltip()
@@ -21187,7 +22829,7 @@ int getEntityHungerInterval(int player, Entity* my, Stat* myStats, EntityHungerI
 		{
 			isAutomatonPlayer = true;
 		}
-		else if ( stats[player]->playerRace == RACE_INSECTOID && stats[player]->appearance == 0 )
+		else if ( stats[player]->playerRace == RACE_INSECTOID && stats[player]->stat_appearance == 0 )
 		{
 			isInsectoidPlayer = true;
 		}
@@ -21198,7 +22840,7 @@ int getEntityHungerInterval(int player, Entity* my, Stat* myStats, EntityHungerI
 		{
 			isAutomatonPlayer = true;
 		}
-		else if ( myStats->playerRace == RACE_INSECTOID && myStats->appearance == 0 )
+		else if ( myStats->playerRace == RACE_INSECTOID && myStats->stat_appearance == 0 )
 		{
 			isInsectoidPlayer = true;
 		}
@@ -21213,7 +22855,7 @@ int getEntityHungerInterval(int player, Entity* my, Stat* myStats, EntityHungerI
 				{
 					isAutomatonPlayer = true;
 				}
-				else if ( myStats->playerRace == RACE_INSECTOID && myStats->appearance == 0 )
+				else if ( myStats->playerRace == RACE_INSECTOID && myStats->stat_appearance == 0 )
 				{
 					isInsectoidPlayer = true;
 				}
@@ -21342,10 +22984,29 @@ void Entity::alertAlliesOnBeingHit(Entity* attacker, std::unordered_set<Entity*>
 								continue;
 							}
 						}
+
 						real_t tangent = atan2(entity->y - this->y, entity->x - this->x);
-						lineTrace(this, this->x, this->y, tangent, 1024, 0, false);
+						if ( buddystats->type == BAT_SMALL && entity->isUntargetableBat() && entity->bodyparts.size() > 0 && entity->monsterSpecialState == BAT_REST )
+						{
+							real_t oldZ = entity->bodyparts[0]->z;
+							entity->bodyparts[0]->z = 0.0; // hack to make it linetraceable
+							lineTrace(this, this->x, this->y, tangent, 64.0, 0, false);
+							entity->bodyparts[0]->z = oldZ;
+						}
+						else
+						{
+							lineTrace(this, this->x, this->y, tangent, 1024, 0, false);
+						}
 						if ( hit.entity == entity )
 						{
+							if ( buddystats->type == BAT_SMALL )
+							{
+								if ( entity->monsterSpecialState == BAT_REST )
+								{
+									entity->disturbBat(attacker, true, false);
+									continue;
+								}
+							}
 							entity->monsterAcquireAttackTarget(*attacker, MONSTER_STATE_PATH);
 						}
 					}
@@ -21398,7 +23059,7 @@ bool Entity::entityCanVomit() const
 		return false;
 	}
 
-	if ( !shapeshifted && myStats->mask && myStats->mask->type == MASK_PLAGUE )
+	if ( !shapeshifted && myStats->mask && (myStats->mask->type == MASK_PLAGUE) )
 	{
 		return false;
 	}
@@ -21537,7 +23198,7 @@ int Entity::getFollowerBonusHPRegen()
 	return regen;
 }
 
-int Entity::getFollowerBonusTrapResist()
+int Entity::getEntityBonusTrapResist()
 {
 	int resist = 0;
 	if ( Stat* myStats = getStats() )
@@ -21571,8 +23232,19 @@ int Entity::getFollowerBonusTrapResist()
 				}
 			}
 		}
+		if ( myStats->cloak && myStats->cloak->type == CLOAK_GUARDIAN )
+		{
+			if ( myStats->cloak->beatitude >= 0 || shouldInvertEquipmentBeatitude(myStats) )
+			{
+				resist += std::min(75, 50 + 25 * (abs(myStats->cloak->beatitude)));
+			}
+			else
+			{
+				resist += 50;
+			}
+		}
 	}
-	return resist;
+	return std::min(100, std::max(-100, resist));
 }
 
 int Entity::getEntityInspirationFromAllies()

@@ -65,6 +65,8 @@ struct PlayerSettings_t
     real_t gamepad_righty_sensitivity = 1.0;
     bool gamepad_rightx_invert = false;
     bool gamepad_righty_invert = false;
+	float quick_turn_speed = 1.f;
+	float quick_turn_speed_mkb = 1.f;
 	void init(const int _player)
 	{
 		player = _player;
@@ -783,7 +785,8 @@ public:
 			MODULE_MAP,
 			MODULE_SIGN_VIEW,
 			MODULE_ITEMEFFECTGUI,
-			MODULE_PORTRAIT
+			MODULE_PORTRAIT,
+			MODULE_ASSISTSHRINE
 		};
 		GUIModules activeModule = MODULE_NONE;
 		GUIModules previousModule = MODULE_NONE;
@@ -804,6 +807,21 @@ public:
 		GUIDropdown_t dropdownMenu;
 		void closeDropdowns();
 		bool isDropdownActive();
+		static void imageResizeToContainer9x9(Frame* container, SDL_Rect dimensionsToFill, const std::vector<std::string>& imgNames);
+		static void imageSetWidthHeight9x9(Frame* container, const std::vector<std::string>& imgNames);
+		static const std::vector<std::string> tooltipEffectBackgroundImages;
+		enum ImageIndexes9x9 : int
+		{
+			TOP_LEFT,
+			TOP_RIGHT,
+			TOP,
+			MIDDLE_LEFT,
+			MIDDLE_RIGHT,
+			MIDDLE,
+			BOTTOM_LEFT,
+			BOTTOM_RIGHT,
+			BOTTOM
+		};
 	} GUI;
 
 	//All the code that sets shootmode = false. Display chests, inventory, books, shopkeeper, identify, whatever.
@@ -995,8 +1013,30 @@ public:
 			bool displayingShortFormTooltip = false;
 			bool displayingTitleOnlyTooltip = false;
 			ItemTooltipDisplay_t();
+			void reset()
+			{
+				type = WOODEN_SHIELD;
+				status = BROKEN;
+				beatitude = 0;
+				count = -1;
+				appearance = 0;
+				identified = false;
+				uid = 0;
+				wasAppraisalTarget = false;
+
+				playernum = -1;
+				playerLVL = -1;
+				playerEXP = -1;
+				playerSTR = -1;
+				playerDEX = -1;
+				playerCON = -1;
+				playerINT = -1;
+				playerPER = -1;
+				playerCHR = -1;
+			}
 		};
 		ItemTooltipDisplay_t itemTooltipDisplay;
+		ItemTooltipDisplay_t compendiumItemTooltipDisplay;
 
 		int DEFAULT_INVENTORY_SIZEX = 12;
 		int DEFAULT_INVENTORY_SIZEY = 3;
@@ -1042,7 +1082,7 @@ public:
 		void updateInventory();
 		void updateCursor();
 		void updateItemContextMenuClickFrame();
-		void updateInventoryItemTooltip();
+		void updateInventoryItemTooltip(Frame* parentFrame = nullptr);
 		void updateSelectedItemAnimation();
 		void updateItemContextMenu();
 		void cycleInventoryTab();
@@ -1655,8 +1695,8 @@ public:
 		void updateEnemyBar(Frame* whichFrame);
 		void updateEnemyBar2(Frame* whichFrame, void* enemyHPDetails);
 		void resetBars();
-		void updateFrameTooltip(Item* item, const int x, const int y, int justify);
-        void finalizeFrameTooltip(Item* item, const int x, const int y, int justify);
+		void updateFrameTooltip(Item* item, const int x, const int y, int justify, Frame* parentFrame = nullptr);
+        void finalizeFrameTooltip(Item* item, const int x, const int y, int justify, Frame* parentFrame = nullptr);
 		void updateStatusEffectTooltip();
 		void updateCursor();
 		void updateActionPrompts();
@@ -1808,6 +1848,7 @@ public:
 		void initStartRoomLocation(int x, int y);
 		bool isControllable();
 		Entity* spawnGhost();
+		Entity* respawn();
 		static void pauseMenuSpectate(const int player);
 		static void pauseMenuSpawnGhost(const int player);
 		static bool gameoverOnDismiss(const int player);
@@ -2266,6 +2307,44 @@ public:
 		static real_t compactBigScale;
 		static real_t compact2pVerticalBigScale;
 	} minimap;
+
+	class CompendiumProgress_t
+	{
+		Player& player;
+	public:
+		std::map<std::string, std::map<int, Sint32>> itemEvents;
+		std::map<int, std::map<std::string, std::map<int, Sint32>>> floorEvents;
+		real_t playerDistAccum = 0.0;
+		Uint32 playerSneakTime = 0;
+		Uint32 playerAliveTimeMoving = 0;
+		Uint32 playerAliveTimeStopped = 0;
+		Uint32 playerAliveTimeTotal = 0;
+		Uint32 playerGameTimeTotal = 0;
+		std::map<int, Uint32> playerEquipSlotTime;
+		std::map<int, Uint32> allyTimeSpent;
+		CompendiumProgress_t(Player& p) : player(p)
+		{};
+		~CompendiumProgress_t() {};
+		void updateFloorEvents();
+	} compendiumProgress;
+
+	class PlayerMechanics_t
+	{
+		Player& player;
+	public:
+		std::map<int, int> itemDegradeRng;
+		bool itemDegradeRoll(Item* item, int* checkInterval = nullptr);
+		void onItemDegrade(Item* item);
+		int sustainedSpellMPUsed = 0;
+		Uint32 defendTicks = 0;
+		bool sustainedSpellLevelChance();
+		void sustainedSpellIncrementMP(int mpChange);
+		std::map<Uint32, int> enemyRaisedBlockingAgainst;
+		bool allowedRaiseBlockingAgainstEntity(Entity& attacker);
+		PlayerMechanics_t(Player& p) : player(p)
+		{};
+		~PlayerMechanics_t() {};
+	} mechanics;
 
 	static void soundMovement();
 	static void soundActivate();
