@@ -942,6 +942,8 @@ Sint32 itemModel(const Item* const item, bool shortModel)
 
 	if ( item->type == TOOL_PLAYER_LOOT_BAG )
 	{
+		int playerOwner = item->getLootBagPlayer();
+		Uint32 index = 4;
 		if ( colorblind_lobby )
 		{
 			int playerOwner = item->getLootBagPlayer();
@@ -967,7 +969,11 @@ Sint32 itemModel(const Item* const item, bool shortModel)
 		}
 		else
 		{
-			return index + item->getLootBagPlayer();
+			if (playerOwner > 4)
+			{
+				index = 72;
+			}
+			return items[item->type].index + item->getLootBagPlayer() + index;
 		}
 	}
 	return index + item->appearance % items[item->type].variations;

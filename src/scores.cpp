@@ -1474,7 +1474,7 @@ void loadAllScores(const std::string& scoresfilename)
 	}
 	versionNumber = atoi(versionStr); // convert from string to int.
 	printlog("notice: '%s' version number %d", scoresfilename.c_str(), versionNumber);
-	if ( versionNumber < 200 || versionNumber > 999 )
+	if ( versionNumber < 100 || versionNumber > 999 )
 	{
 		// if version number less than v2.0.0, or more than 3 digits, abort and rebuild scores file.
 		printlog("error: '%s' is corrupt!\n", scoresfilename.c_str());
@@ -1507,7 +1507,7 @@ void loadAllScores(const std::string& scoresfilename)
 	}
 	for ( int c = 0; c < NUMCLASSES; c++ )
 	{
-		if ( versionNumber < 300 )
+		if ( versionNumber < 100 )
 		{
 			if ( c < 10 )
 			{
@@ -1518,7 +1518,7 @@ void loadAllScores(const std::string& scoresfilename)
 				usedClass[c] = false;
 			}
 		}
-		else if ( versionNumber < 323 )
+		else if ( versionNumber < 100 )
 		{
 			if ( c < 13 )
 			{
@@ -1537,7 +1537,7 @@ void loadAllScores(const std::string& scoresfilename)
 
 	for ( int c = 0; c < NUMRACES; c++ )
 	{
-		if ( versionNumber <= 325 )
+		if ( versionNumber <= 100 )
 		{
 			// don't read race info.
 			usedRace[c] = false;
@@ -1580,7 +1580,7 @@ void loadAllScores(const std::string& scoresfilename)
 		node->deconstructor = &scoreDeconstructor;
 		node->size = sizeof(score_t);
 
-		if ( versionNumber < 300 )
+		if ( versionNumber < 100 )
 		{
 			// legacy nummonsters
 			for ( int c = 0; c < NUMMONSTERS; c++ )
@@ -1595,7 +1595,7 @@ void loadAllScores(const std::string& scoresfilename)
 				}
 			}
 		}
-		else if ( versionNumber < 325 )
+		else if ( versionNumber < 100 )
 		{
 			// legacy nummonsters
 			for ( int c = 0; c < NUMMONSTERS; c++ )
@@ -1640,13 +1640,13 @@ void loadAllScores(const std::string& scoresfilename)
 		fp->read(&score->stats->type, sizeof(Monster), 1);
 		fp->read(&score->stats->sex, sizeof(sex_t), 1);
 		fp->read(&score->stats->stat_appearance, sizeof(Uint32), 1);
-		if ( versionNumber >= 323 )
+		if ( versionNumber >= 100 )
 		{
 			score->stats->playerRace = ((score->stats->stat_appearance & 0xFF00) >> 8);
 			score->stats->stat_appearance = (score->stats->stat_appearance & 0xFF);
 		}
 		fp->read(&score->stats->name, sizeof(char), 32);
-		if ( versionNumber >= 412 )
+		if ( versionNumber >= 100 )
 		{
 			fp->read(&score->stats->killer_monster, sizeof(Uint32), 1);
 			fp->read(&score->stats->killer_item, sizeof(Uint32), 1);
@@ -1682,7 +1682,7 @@ void loadAllScores(const std::string& scoresfilename)
 		fp->read(&score->stats->HUNGER, sizeof(Sint32), 1);
 		for ( int c = 0; c < NUMPROFICIENCIES; c++ )
 		{
-			if ( versionNumber < 323 && c >= PRO_UNARMED )
+			if ( versionNumber < 100 && c >= PRO_UNARMED )
 			{
 				score->stats->setProficiency(c, 0);
 			}
@@ -1693,7 +1693,7 @@ void loadAllScores(const std::string& scoresfilename)
 				score->stats->setProficiency(c, val);
 			}
 		}
-		if ( versionNumber < 300 )
+		if ( versionNumber < 100 )
 		{
 			// legacy effects
 			for ( int c = 0; c < NUMEFFECTS; c++ )
@@ -1710,7 +1710,7 @@ void loadAllScores(const std::string& scoresfilename)
 				}
 			}
 		}
-		else if ( versionNumber < 302 )
+		else if ( versionNumber < 100 )
 		{
 			for ( int c = 0; c < NUMEFFECTS; c++ )
 			{
@@ -1726,7 +1726,7 @@ void loadAllScores(const std::string& scoresfilename)
 				}
 			}
 		}
-		else if ( versionNumber <= 323 )
+		else if ( versionNumber <= 100 )
 		{
 			for ( int c = 0; c < NUMEFFECTS; c++ )
 			{
@@ -1742,7 +1742,7 @@ void loadAllScores(const std::string& scoresfilename)
 				}
 			}
 		}
-		else if ( versionNumber <= 411 )
+		else if ( versionNumber <= 100 )
 		{
 			for ( int c = 0; c < NUMEFFECTS; c++ )
 			{
@@ -1767,7 +1767,7 @@ void loadAllScores(const std::string& scoresfilename)
 			}
 		}
 
-		if ( versionNumber >= 310 )
+		if ( versionNumber >= 100 )
 		{
 			for ( int c = 0; c < NUM_CONDUCT_CHALLENGES; ++c )
 			{
@@ -2836,7 +2836,7 @@ int loadGameOld(int player, int saveIndex)
 	fp->read(&clientnum, sizeof(Uint32), 1);
 	fp->read(&mapseed, sizeof(Uint32), 1);
 	fp->read(&currentlevel, sizeof(Uint32), 1);
-	if ( versionNumber >= 323 )
+	if ( versionNumber >= 100 )
 	{
 		loadedHash = (currentlevel & 0xFFFFFF00) >> 8;
 		currentlevel = currentlevel & 0xFF;
@@ -2847,7 +2847,7 @@ int loadGameOld(int player, int saveIndex)
 	fp->read(&conductFoodless, sizeof(bool), 1);
 	fp->read(&conductVegetarian, sizeof(bool), 1);
 	fp->read(&conductIlliterate, sizeof(bool), 1);
-	if ( versionNumber >= 310 )
+	if ( versionNumber >= 100 )
 	{
 		for ( int c = 0; c < NUM_CONDUCT_CHALLENGES; ++c )
 		{
@@ -2858,7 +2858,7 @@ int loadGameOld(int player, int saveIndex)
 			fp->read(&gameStatistics[c], sizeof(Sint32), 1);
 		}
 	}
-	if ( versionNumber >= 335 )
+	if ( versionNumber >= 100 )
 	{
 		gameModeManager.currentSession.saveServerFlags();
 		if ( multiplayer == CLIENT )
@@ -2903,7 +2903,7 @@ int loadGameOld(int player, int saveIndex)
 	            }
 
 				clientLearnedAlchemyRecipes[c].clear();
-				if ( versionNumber >= 381 )
+				if ( versionNumber >= 100 )
 				{
 					// read alchemy recipes
 					Uint32 numrecipes = 0;
@@ -2919,7 +2919,7 @@ int loadGameOld(int player, int saveIndex)
 				}
 
 				clientLearnedScrollLabels[c].clear();
-				if ( versionNumber >= 382 )
+				if ( versionNumber >= 100 )
 				{
 					// read scroll labels
 					Uint32 numscrolls = 0;
@@ -2943,7 +2943,7 @@ int loadGameOld(int player, int saveIndex)
 	                fp->seek(sizeof(Uint32), File::SeekMode::ADD);
                 }
 
-				if ( versionNumber >= 381 )
+				if ( versionNumber >= 100 )
 				{
 					// read alchemy recipes
 					Uint32 numrecipes = 0;
@@ -2956,7 +2956,7 @@ int loadGameOld(int player, int saveIndex)
 					}
 				}
 
-				if ( versionNumber >= 382 )
+				if ( versionNumber >= 100 )
 				{
 					// read scroll labels
 					Uint32 numscrolls = 0;
@@ -2994,7 +2994,7 @@ int loadGameOld(int player, int saveIndex)
 	    }
 
 		clientLearnedAlchemyRecipes[player].clear();
-		if ( versionNumber >= 381 )
+		if ( versionNumber >= 100 )
 		{
 			// read alchemy recipes
 			Uint32 numrecipes = 0;
@@ -3010,7 +3010,7 @@ int loadGameOld(int player, int saveIndex)
 		}
 
 		clientLearnedScrollLabels[player].clear();
-		if ( versionNumber >= 382 )
+		if ( versionNumber >= 100 )
 		{
 			// read scroll labels
 			Uint32 numscrolls = 0;
@@ -3025,7 +3025,7 @@ int loadGameOld(int player, int saveIndex)
     }
 
 	int monsters = NUMMONSTERS;
-	if ( versionNumber < 325 )
+	if ( versionNumber < 100 )
 	{
 		monsters = 33;
 	}
@@ -3054,7 +3054,7 @@ int loadGameOld(int player, int saveIndex)
 		fp->seek(sizeof(Sint32), File::SeekMode::ADD);
 		fp->seek(sizeof(Sint32), File::SeekMode::ADD);
 
-		if ( versionNumber >= 323 )
+		if ( versionNumber >= 100 )
 		{
 			fp->seek( sizeof(Sint32)*NUMPROFICIENCIES, File::SeekMode::ADD);
 		}
@@ -3063,7 +3063,7 @@ int loadGameOld(int player, int saveIndex)
 			fp->seek(sizeof(Sint32)*14, File::SeekMode::ADD);
 		}
 
-		if ( versionNumber <= 323 ) // legacy
+		if ( versionNumber <= 100 ) // legacy
 		{
 			fp->seek(sizeof(bool)*32, File::SeekMode::ADD);
 			fp->seek(sizeof(Sint32)*32, File::SeekMode::ADD);
@@ -3074,7 +3074,7 @@ int loadGameOld(int player, int saveIndex)
 			fp->seek(sizeof(Sint32)*NUMEFFECTS, File::SeekMode::ADD);
 		}
 
-		if ( versionNumber >= 323 )
+		if ( versionNumber >= 100 )
 		{
 			fp->seek(sizeof(Sint32)*32, File::SeekMode::ADD); // stat flags
 		}
@@ -3150,7 +3150,7 @@ int loadGameOld(int player, int saveIndex)
 	fp->read(&stats[player]->type, sizeof(Monster), 1);
 	fp->read(&stats[player]->sex, sizeof(sex_t), 1);
 	fp->read(&stats[player]->stat_appearance, sizeof(Uint32), 1);
-	if ( versionNumber >= 323 )
+	if ( versionNumber >= 100 )
 	{
 		stats[player]->playerRace = ((stats[player]->stat_appearance & 0xFF00) >> 8);
 		stats[player]->stat_appearance = (stats[player]->stat_appearance & 0xFF);
@@ -3172,7 +3172,7 @@ int loadGameOld(int player, int saveIndex)
 	fp->read(&stats[player]->HUNGER, sizeof(Sint32), 1);
 	for ( int c = 0; c < NUMPROFICIENCIES; c++ )
 	{
-		if ( versionNumber < 323 && c >= PRO_UNARMED )
+		if ( versionNumber < 100 && c >= PRO_UNARMED )
 		{
 			stats[player]->setProficiency(c, 0);
 		}
@@ -3185,7 +3185,7 @@ int loadGameOld(int player, int saveIndex)
 	}
 	for ( int c = 0; c < NUMEFFECTS; c++ )
 	{
-		if ( versionNumber <= 323 ) // legacy
+		if ( versionNumber <= 100 ) // legacy
 		{
 			if ( c < 32 )
 			{
@@ -3204,7 +3204,7 @@ int loadGameOld(int player, int saveIndex)
 			fp->read(&stats[player]->EFFECTS_TIMERS[c], sizeof(Sint32), 1);
 		}
 	}
-	if ( versionNumber >= 323 )
+	if ( versionNumber >= 100 )
 	{
 		for ( int c = 0; c < 32; c++ )
 		{
@@ -3585,7 +3585,7 @@ list_t* loadGameFollowersOld(int saveIndex)
 
 			for ( int j = 0; j < NUMPROFICIENCIES; j++ )
 			{
-				if ( versionNumber < 323 && j >= PRO_UNARMED )
+				if ( versionNumber < 100 && j >= PRO_UNARMED )
 				{
 					followerStats->setProficiency(j, 0);
 				}
@@ -3598,7 +3598,7 @@ list_t* loadGameFollowersOld(int saveIndex)
 			}
 			for ( int j = 0; j < NUMEFFECTS; j++ )
 			{
-				if ( versionNumber <= 323 ) // legacy
+				if ( versionNumber <= 100 ) // legacy
 				{
 					if ( c < 32 )
 					{
@@ -3617,14 +3617,14 @@ list_t* loadGameFollowersOld(int saveIndex)
 					fp->read(&followerStats->EFFECTS_TIMERS[j], sizeof(Sint32), 1);
 				}
 			}
-			if ( versionNumber >= 323 )
+			if ( versionNumber >= 100 )
 			{
 				for ( int j = 0; j < 32; ++j )
 				{
 					fp->read(&followerStats->MISC_FLAGS[j], sizeof(Sint32), 1);
 				}
 			}
-			if ( versionNumber >= 384 )
+			if ( versionNumber >= 100 )
 			{
 				Uint32 numAttributes = 0;
 				fp->read(&numAttributes, sizeof(Uint32), 1);
@@ -3948,7 +3948,7 @@ int getSavegameVersion(const char* checkstr)
 		}
 	}
 	versionNumber = atoi(versionStr); // convert from string to int.
-	if ( versionNumber < 200 || versionNumber > 999 )
+	if ( versionNumber < 100 || versionNumber > 999 )
 	{
 		// if version number less than v2.0.0, or more than 3 digits, abort.
 		return -1;
@@ -6873,9 +6873,7 @@ int SaveGameInfo::populateFromSession(const int playernum)
 	{
 		info->additional_data.push_back(std::make_pair("game_scenario", gameModeManager.currentSession.challengeRun.scenarioStr));
 	}
-
-
-	if ( info->game_version >= 410 )
+	if ( info->game_version >= 100 )
 	{
 		info->computeHash(info->player_num, info->hash);
 	}

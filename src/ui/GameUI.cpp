@@ -3727,6 +3727,27 @@ std::vector<std::vector<std::string>> playerXPCapPaths = {
 		"*#images/ui/HUD/xpbar/HUD_Exp_SandCap_04b.png",
 		"*#images/ui/HUD/xpbar/HUD_Exp_SandCap_04c.png",
 		"*#images/ui/HUD/xpbar/HUD_Exp_SandCap_04d.png",
+	},
+	{
+		"*#images/ui/HUD/xpbar/HUD_Exp_SandCap_05.png",
+		"*#images/ui/HUD/xpbar/HUD_Exp_SandCap_05a.png",
+		"*#images/ui/HUD/xpbar/HUD_Exp_SandCap_05b.png",
+		"*#images/ui/HUD/xpbar/HUD_Exp_SandCap_05c.png",
+		"*#images/ui/HUD/xpbar/HUD_Exp_SandCap_05d.png",
+	},
+	{
+		"*#images/ui/HUD/xpbar/HUD_Exp_SandCap_06.png",
+		"*#images/ui/HUD/xpbar/HUD_Exp_SandCap_06a.png",
+		"*#images/ui/HUD/xpbar/HUD_Exp_SandCap_06b.png",
+		"*#images/ui/HUD/xpbar/HUD_Exp_SandCap_06c.png",
+		"*#images/ui/HUD/xpbar/HUD_Exp_SandCap_06d.png",
+	},
+	{
+		"*#images/ui/HUD/xpbar/HUD_Exp_SandCap_07.png",
+		"*#images/ui/HUD/xpbar/HUD_Exp_SandCap_07a.png",
+		"*#images/ui/HUD/xpbar/HUD_Exp_SandCap_07b.png",
+		"*#images/ui/HUD/xpbar/HUD_Exp_SandCap_07c.png",
+		"*#images/ui/HUD/xpbar/HUD_Exp_SandCap_07d.png",
 	}
 };
 
@@ -3774,6 +3795,18 @@ void createXPBar(const int player)
 				break;
 			case 3:
 				bodyPath += "03.png";
+				break;
+			case 4:
+				bodyPath += "04.png";
+				break;
+			case 5:
+				bodyPath += "05.png";
+				break;
+			case 6:
+				bodyPath += "06.png";
+				break;
+			case 7:
+				bodyPath += "07.png";
 				break;
 		}
 	}
